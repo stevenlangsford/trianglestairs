@@ -1,0 +1,28 @@
+{
+  "name": "minexp",
+  "version": "1.0.0",
+  "description": "BYC member survey",
+    "main": "index.js",
+      "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stevenlangsford/BYCmembersurvey.git"
+  },
+  "keywords": [
+    "survey"
+  ],
+  "author": "stevenlangsford",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/stevenlangsford/BYCmembersurvey/issues"
+  },
+  "homepage": "https://github.com/stevenlangsford/BYCmembersurvey#readme",
+  "dependencies": {
+      "ejs": "^2.5.7",
+      "express": "^4.16.2",
+      "pg":"6.x"
+  }
+}
