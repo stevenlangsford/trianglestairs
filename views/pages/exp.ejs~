@@ -6,8 +6,7 @@
     <meta name="description" content="study">
     <meta name="viewport" content="width=device-width">
     <link rel="stylesheet" type="text/css" href="style.css">
-    <script src="js/jquery-1.11.3.min.js"></script>
-    <title>Study</title>
+    <title>BYC member survey</title>
 
   </head>
   <body>

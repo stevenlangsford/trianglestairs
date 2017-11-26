@@ -1,5 +1,11 @@
-body{
+body {
     background-color:lightgrey;
     color:black;
     font-size:1.5em;
 }
+
+p {
+    margin-left:auto;
+    margin-right:auto;
+    text-align:center;
+ }

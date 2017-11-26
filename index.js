@@ -13,11 +13,20 @@ app.use(myParser.urlencoded({extended : true}));
 app.set('view engine', 'ejs');
 app.disable('x-powered-by'); //won't report what server is running, recommended for security & doesn't hurt.
 
-
+ 
 app.get('/', function (req, res) {
     res.render("pages/index");
+   
 })
 
+app.get('/run',function(req,res){
+    res.render("pages/exp");
+});
+
+app.post('/exp',function(req,res){
+    //not sure why this needs to bounce to new route to render, but it does seem to. I need to learn some express!
+    return res.status(200).send("/run");    
+})
 
 app.post('/dbquery',function(req,res){
     
