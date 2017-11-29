@@ -1,4 +1,5 @@
 var ppntID = Math.round(Math.random()*10000000);
+localStorage.setItem("ppntID",ppntID); //cookie alternative, retrive with localStorage.getItem("ppntID"). Only stores strings. Used in exp.js to tag saved trials.
 
 var dev = false;
 var instructionindex = 0;
