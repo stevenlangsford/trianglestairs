@@ -27,7 +27,10 @@ function nextTrial(){
     }
 }
 
-// a trial object should: drawMe and record draw time. Record a response and a response time. Be saveable and restoreable.
+// a trial object should have a drawMe function and a bunch of attributes.
+//the data-getting process in 'dashboard.ejs' & getData routes creates a csv with a col for every attribute, using 'Object.keys' to list all the properties of the object. Assumes a pattern where everything interesting is saved to the trial object, then that is JSONified and saved as a response.
+//Note functions are dropped by JSON.
+//Also note this means you have to be consistent with the things that are added to each trial before they are saved, maybe init with NA values in the constructor.
 function makeTrial(questiontext){
     this.ppntID = localStorage.getItem("ppntID");
     this.questiontext = questiontext;
@@ -37,7 +40,6 @@ function makeTrial(questiontext){
 	document.getElementById(targdiv).innerHTML=
 	    "<div class='trialdiv'><p>"+this.questiontext+"</br>"+responses+"</p></div>";
     }
-    this.csvHeaders = ["ppntID","questiontext","drawTime","responseTime","response"];// dashboard.ejs assumes these exist (with these exact names) when generating responses csv.
 }
 
 

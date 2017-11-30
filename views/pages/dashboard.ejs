@@ -11,44 +11,20 @@
 
   </head>
   <body>
-    <div id="dashnavdiv">demographics <button onclick="responsesCSV()">download responses</button></div>
-    </br></hr>
-    <div id="uberdiv">
       <!-- Would be nice to show hits/activity here? Or something? -->
       <script>
-	function responsesCSV(){
+function getData(targtable){
+window.location.replace("/get"+targtable); //the classy thing to do would be to have one DRY getData function on the server and pass table names to it. Right now I can pass targtable names in a $.post request OR have the response produce a file download prompt, but not both at once. :-( Sorry.
 
-	var responses = <%- JSON.stringify(responseobj) %>;
-	var responses = responses.map(JSON.parse);
 
-	if(!responses||responses.length==0){
-	alert("No responses in database");
-	return;
-	}
-	
-	let csvContent="data:text/csv;charset=utf-8,";
-	csvContent+=responses[0].csvHeaders.join(",")+"\r\n";
-	responses.forEach(function(response){
-	var hm_values = response.csvHeaders.length;
-	for(var i=0;i<hm_values;i++){
-	    csvContent+=response[response.csvHeaders[i]];
-	    if(i < hm_values-1){
-		csvContent+=",";
-	    }else{
-		csvContent+="\r\n";
-	    }
-	}
-		   });//for each response
-   var encodedUri = encodeURI(csvContent);
-   var link = document.createElement("a");
-   link.setAttribute("href", encodedUri);
-   link.setAttribute("download", "my_data.csv");
-   document.body.appendChild(link); // Required for FF
-   link.click();
-}
-	
-      </script>
-	  
+}//end getData
+	</script>
+
+
+
+ <div id="dashnavdiv"><button onclick="getData('demographics')">download demographics</button></br><button onclick="getData('responses')">download responses</button></div>
+    </br></hr>
+    <div id="uberdiv">
     </div>
   </body>
 </html>

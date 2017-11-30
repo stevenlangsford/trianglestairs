@@ -3,6 +3,7 @@ const myParser = require("body-parser");
 const ejs = require('ejs');
 const app = express();
 const pg = require('pg');
+const json2csv = require('json2csv');
 const helmet = require('helmet'); //minimal security best practices. Sets HTTP headers to block first-pass vulnerability sniffing and clickjacking stuff.
 //See: https://github.com/helmetjs/helmet
 //Also: https://expressjs.com/en/advanced/best-practice-security.html
@@ -101,26 +102,55 @@ app.post('/response',function(req,res){
 
 //experimenter-facing routes: login, see the data and usage stats.
 
-app.get("/dashboard",function(req,res){
-
+app.get("/getresponses",function(req,res){
     var pool = new pg.Pool({connectionString:process.env.DATABASE_URL});
     pool.connect(function(err,client,done){
 	client.query('select * from responses',function(err,result){
 	    if(err){
 		{console.error(err); res.send("Error "+err);}
 		}else{
-		    var responseInfo = {time:[],
-					responseobj:[]
-				       }
+		    //TODO do something sensible if there are no results!
+		    var fields = Object.keys(JSON.parse(result.rows[0].responseobj));
+		    var responses = [];
 		    	   for(var i=0;i<result.rowCount;i++){
-			       responseInfo.time.push(result.rows[i].time);
-			       responseInfo.responseobj.push(result.rows[i].responseobj);
+			       responses.push(JSON.parse(result.rows[i].responseobj));
 			   }
-		    res.render('pages/dashboard', responseInfo);
+
+		    var response_csv = json2csv({data: responses, fields:fields});
+		    res.attachment("responsedata.csv");
+		    res.send(response_csv);
 		}
 	});//end query
     });
-    pool.end();
+    pool.end();    
+});
+
+
+//should collapse this and getresponses into one getData and pass it the target table name? Two issues with that, differing col names in the db and getting file-save prompts from the client page.
+app.get("/getdemographics",function(req,res){
+    var pool = new pg.Pool({connectionString:process.env.DATABASE_URL});
+    pool.connect(function(err,client,done){
+	client.query('select * from demographics',function(err,result){
+	    if(err){
+		{console.error(err); res.send("Error "+err);}
+		}else{
+		    //TODO do something sensible if there are no results!
+		    var fields = Object.keys(JSON.parse(result.rows[0].demoobj));
+		    var responses = [];
+		    	   for(var i=0;i<result.rowCount;i++){
+			       responses.push(JSON.parse(result.rows[i].demoobj));
+			   }
+		    var response_csv = json2csv({data: responses, fields:fields});
+		    res.attachment("demographicsdata.csv");
+		    res.send(response_csv);
+		}
+	});//end query
+    });
+    pool.end();    
+});
+
+app.get("/dashboard",function(req,res){
+    res.render('pages/dashboard');
 });
 // app.post('/loginhandler',function(req,res){
 // //save the response in db
