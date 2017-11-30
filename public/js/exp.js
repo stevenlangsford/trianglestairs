@@ -11,7 +11,7 @@ function responseListener(aresponse){//global so it'll be just sitting here avai
     trials[trialindex].responseTime= Date.now();
     
     $.post('/response',{myresponse:JSON.stringify(trials[trialindex])},function(success){
-    	console.log(success);//For now server returns the string "success" for success, doesn't communicate any errors.
+    	console.log(success);//For now server returns the string "success" for success, otherwise error message.
     });
     
     //can put this inside the success callback, if the next trial depends on some server-side info.
@@ -35,9 +35,9 @@ function makeTrial(questiontext){
 	this.drawTime = Date.now();
 	var responses = "<button onclick='responseListener(\"yes\")'>Yes</button><button onclick='responseListener(\"no\")'>No</button>";
 	document.getElementById(targdiv).innerHTML=
-	    "<div class='trialdiv'><p>"+questiontext+"</br>"+responses+"</p></div>";
+	    "<div class='trialdiv'><p>"+this.questiontext+"</br>"+responses+"</p></div>";
     }
-    this.drawMeString = "("+this.drawMe.toString()+")"; //store as a string because functions dropped by JSON. Brackets added because these are essential for eval(theString) to restore the function like you'd expect, I don't really grok why.
+    this.csvHeaders = ["ppntID","questiontext","drawTime","responseTime","response"];// dashboard.ejs assumes these exist (with these exact names) when generating responses csv.
 }
 
 

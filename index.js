@@ -7,6 +7,8 @@ const helmet = require('helmet'); //minimal security best practices. Sets HTTP h
 //See: https://github.com/helmetjs/helmet
 //Also: https://expressjs.com/en/advanced/best-practice-security.html
 
+
+//App settings:
 app.set('port', (process.env.PORT || 5000));
 
 app.set('views', __dirname + '/views');
@@ -15,8 +17,17 @@ app.use(myParser.urlencoded({extended : true}));
 app.use(helmet()); //default settings, can customize here.
 app.set('view engine', 'ejs');
 
+//local helper functions
+// function requireLogin (request, response, next) {
+//     if (!request.session.user) {
+// 	response.redirect('/');//should set a 'you bounced' setting and goto the login page:TODO
+//     } else {
+// 	next();
+//     }
+// };
 
- 
+//routes
+//participant-facing routes, including index.
 app.get('/', function (req, res) {
     res.render("pages/index");
    
@@ -37,11 +48,34 @@ app.post('/finish',function(req,res){
     return res.status(200).send("/done");//Another instance of the double-bounce to render.
 });
 
+
+app.post('/demographics',function(req,res){
+//save the response in db
+    var pool = new pg.Pool(
+	{connectionString:process.env.DATABASE_URL}
+    )    
+    // connection using created pool
+    pool.connect(function(err, client, done) {
+    	client.query('insert into demographics values ($1, $2)', //Probably a crime to save a multi-value objs in one 'info' col. Oh well.
+		     [Date.now(),
+		     req.body.demographics],
+    		     function(err, result){
+    			 if (err)
+    			 {console.error(err); res.send("Error " + err); } //For now the client just prints the error to the console. What's ideal?
+    			 else
+    			 { // response.render('pages/db', {results: result.rows});
+    			     res.send("success");
+    			 }
+    		     });//end query
+	done();
+    });
+    // pool shutdown
+    pool.end()
+});
+
+
 app.post('/response',function(req,res){
-    //    console.log("I hear:"+req.body.myresponse); //works
-
-    //save the response in db
-
+//save the response in db
     var pool = new pg.Pool(
 	{connectionString:process.env.DATABASE_URL}
     )    
@@ -51,7 +85,6 @@ app.post('/response',function(req,res){
 		     [Date.now(),
 		     req.body.myresponse],
     		     function(err, result){
-    			 done();
     			 if (err)
     			 {console.error(err); res.send("Error " + err); } //For now the client just prints the error to the console. What's ideal?
     			 else
@@ -59,11 +92,70 @@ app.post('/response',function(req,res){
     			     res.send("success");
     			 }
     		     });//end query
-	done()
+	done();
     });
     // pool shutdown
     pool.end()
 });
+
+
+//experimenter-facing routes: login, see the data and usage stats.
+
+app.get("/dashboard",function(req,res){
+
+    var pool = new pg.Pool({connectionString:process.env.DATABASE_URL});
+    pool.connect(function(err,client,done){
+	client.query('select * from responses',function(err,result){
+	    if(err){
+		{console.error(err); res.send("Error "+err);}
+		}else{
+		    var responseInfo = {time:[],
+					responseobj:[]
+				       }
+		    	   for(var i=0;i<result.rowCount;i++){
+			       responseInfo.time.push(result.rows[i].time);
+			       responseInfo.responseobj.push(result.rows[i].responseobj);
+			   }
+		    res.render('pages/dashboard', responseInfo);
+		}
+	});//end query
+    });
+    pool.end();
+});
+// app.post('/loginhandler',function(req,res){
+// //save the response in db
+//     var pool = new pg.Pool(
+// 	{connectionString:process.env.DATABASE_URL}
+//     )    
+//     // connection using created pool
+//     pool.connect(function(err, client, done) {
+//     	client.query('select * from users where id=$1',
+// 		     [],
+//     		     function(err, result){
+//     			 done();
+//     			 if (err)
+//     			 {console.error(err); res.send("Error " + err); }
+//     			 else
+//     			 { // response.render('pages/db', {results: result.rows});
+// 			     if(result.rowCount==0){
+// 				 request.session.loginbounce=true;
+// 				 response.redirect("/"); //should go to login page
+//   				 return;
+//   			     }
+//   			     request.session.pwdmatch=result.rows[0].password==request.body.loginpwd;
+// 			     if(result.rows[0].password==request.body.loginpwd){
+// 				 //login success.
+// 			     }else{
+// 				 //login failure.
+// 			     }
+			     
+//     			 }
+//     		     });//end query
+// 	done()
+//     });
+//     // pool shutdown
+//     pool.end()
+// });
 
 
 //db template:

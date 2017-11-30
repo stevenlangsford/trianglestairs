@@ -12,7 +12,7 @@
   </head>
   <body>
     <!-- predef html resources -->
-    <div id="uberdiv" class='centered'>
+    <div id="uberdiv">
       <h1>Thank you</h1>
       <p>You're done!</p>
       <p>Your completion code is:</br> <span id='completioncodespan'></span></p>
