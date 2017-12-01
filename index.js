@@ -3,6 +3,7 @@ const myParser = require("body-parser");
 const ejs = require('ejs');
 const app = express();
 const pg = require('pg');
+const session = require('client-sessions');
 const json2csv = require('json2csv');
 const helmet = require('helmet'); //minimal security best practices. Sets HTTP headers to block first-pass vulnerability sniffing and clickjacking stuff.
 //See: https://github.com/helmetjs/helmet
@@ -10,6 +11,14 @@ const helmet = require('helmet'); //minimal security best practices. Sets HTTP h
 
 
 //App settings:
+
+app.use(session({
+  cookieName: 'session',
+  secret: 'not_the_actual_secret',
+  duration: 30 * 60 * 1000,
+  activeDuration: 5 * 60 * 1000,
+}));
+
 app.set('port', (process.env.PORT || 5000));
 
 app.set('views', __dirname + '/views');
@@ -18,14 +27,28 @@ app.use(myParser.urlencoded({extended : true}));
 app.use(helmet()); //default settings, can customize here.
 app.set('view engine', 'ejs');
 
-//local helper functions
-// function requireLogin (request, response, next) {
-//     if (!request.session.user) {
-// 	response.redirect('/');//should set a 'you bounced' setting and goto the login page:TODO
-//     } else {
-// 	next();
-//     }
-// };
+//data viewing routes: with basic login mechanism
+function requireLogin (request, response, next) {
+    if (request.session.authtoken) {
+	next();
+    } else {
+	response.render('pages/dashboard',{auth:"notyet"});
+    }
+};
+
+app.post('/login',function(req,res){
+    if(req.body.token=="keys")req.session.authtoken=true; //set session token
+    return res.status(200).send("/dashboard"); //dashboard checks if session token is set
+//    res.render("pages/dashboard",{auth:"true"});
+});
+
+app.get("/dashboard",function(req,res){
+    if(req.session.authtoken){
+	res.render('pages/dashboard',{auth:"ok"});}
+    else{
+	res.render('pages/dashboard',{auth:"notyet"});
+    }
+});
 
 //routes
 //participant-facing routes, including index.
@@ -102,7 +125,7 @@ app.post('/response',function(req,res){
 
 //experimenter-facing routes: login, see the data and usage stats.
 
-app.get("/getresponses",function(req,res){
+app.get("/getresponses",requireLogin,function(req,res){
     var pool = new pg.Pool({connectionString:process.env.DATABASE_URL});
     pool.connect(function(err,client,done){
 	client.query('select * from responses',function(err,result){
@@ -127,7 +150,7 @@ app.get("/getresponses",function(req,res){
 
 
 //should collapse this and getresponses into one getData and pass it the target table name? Two issues with that, differing col names in the db and getting file-save prompts from the client page.
-app.get("/getdemographics",function(req,res){
+app.get("/getdemographics",requireLogin,function(req,res){
     var pool = new pg.Pool({connectionString:process.env.DATABASE_URL});
     pool.connect(function(err,client,done){
 	client.query('select * from demographics',function(err,result){
@@ -149,9 +172,7 @@ app.get("/getdemographics",function(req,res){
     pool.end();    
 });
 
-app.get("/dashboard",function(req,res){
-    res.render('pages/dashboard');
-});
+
 // app.post('/loginhandler',function(req,res){
 // //save the response in db
 //     var pool = new pg.Pool(

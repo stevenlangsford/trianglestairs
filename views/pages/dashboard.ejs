@@ -15,16 +15,27 @@
       <script>
 function getData(targtable){
 window.location.replace("/get"+targtable); //the classy thing to do would be to have one DRY getData function on the server and pass table names to it. Right now I can pass targtable names in a $.post request OR have the response produce a file download prompt, but not both at once. :-( Sorry.
-
-
 }//end getData
+
+function login(){
+//console.log(document.getElementById('logintextarea').value);
+$.post("/login",{token:document.getElementById('logintextarea').value},function(data){window.location.replace(data)});
+}
 	</script>
 
 
 
- <div id="dashnavdiv"><button onclick="getData('demographics')">download demographics</button></br><button onclick="getData('responses')">download responses</button></div>
-    </br></hr>
-    <div id="uberdiv">
-    </div>
+      <div id="dashnavdiv">
+
+
+	<% if(auth=="notyet"){%>
+	<p>Login key:<textarea id='logintextarea'></textarea><button onclick='login()'>Login</button></br>
+	<button id='demographicsbutton' onclick="getData('demographics')" disabled>download demographics</button></br>
+	<button id='responsesbutton' onclick="getData('responses')" disabled >download responses</button>
+	<%}else{%>
+	<button id='demographicsbutton' onclick="getData('demographics')">download demographics</button></br>
+	<button id='responsesbutton' onclick="getData('responses')">download responses</button>
+	<%}%>
+      </div>
   </body>
 </html>
