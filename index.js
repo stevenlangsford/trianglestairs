@@ -8,9 +8,10 @@ const json2csv = require('json2csv');
 const helmet = require('helmet'); //minimal security best practices. Sets HTTP headers to block first-pass vulnerability sniffing and clickjacking stuff.
 //See: https://github.com/helmetjs/helmet
 //Also: https://expressjs.com/en/advanced/best-practice-security.html
-
+const favicon = require('serve-favicon')
 
 //App settings:
+app.use(favicon(__dirname + '/public/psi.ico')); //You might want to change this.
 
 app.use(session({
   cookieName: 'session',
@@ -28,6 +29,7 @@ app.use(helmet()); //default settings, can customize here.
 app.set('view engine', 'ejs');
 
 //data viewing routes: with basic login mechanism
+//requirelogin is applied to getdemographics and getresponses (which download data csvs)
 function requireLogin (request, response, next) {
     if (request.session.authtoken) {
 	next();
@@ -50,80 +52,6 @@ app.get("/dashboard",function(req,res){
     }
 });
 
-//routes
-//participant-facing routes, including index.
-app.get('/', function (req, res) {
-    res.render("pages/index");
-   
-})
-
-app.get('/run',function(req,res){
-    res.render("pages/exp");
-});
-app.post('/exp',function(req,res){
-    //not sure why this needs to bounce to a new route to render, but it does seem to. I need to learn some express!
-    return res.status(200).send("/run");    
-})
-
-app.get('/done',function(req,res){
-    res.render("pages/outro");
-});
-app.post('/finish',function(req,res){
-    return res.status(200).send("/done");//Another instance of the double-bounce to render.
-});
-
-
-app.post('/demographics',function(req,res){
-//save the response in db
-    var pool = new pg.Pool(
-	{connectionString:process.env.DATABASE_URL}
-    )    
-    // connection using created pool
-    pool.connect(function(err, client, done) {
-    	client.query('insert into demographics values ($1, $2)', //Probably a crime to save a multi-value objs in one 'info' col. Oh well.
-		     [Date.now(),
-		     req.body.demographics],
-    		     function(err, result){
-    			 if (err)
-    			 {console.error(err); res.send("Error " + err); } //For now the client just prints the error to the console. What's ideal?
-    			 else
-    			 { // response.render('pages/db', {results: result.rows});
-    			     res.send("success");
-    			 }
-    		     });//end query
-	done();
-    });
-    // pool shutdown
-    pool.end()
-});
-
-
-app.post('/response',function(req,res){
-//save the response in db
-    var pool = new pg.Pool(
-	{connectionString:process.env.DATABASE_URL}
-    )    
-    // connection using created pool
-    pool.connect(function(err, client, done) {
-    	client.query('insert into responses values ($1,$2)', //NOTE this assumes table responses exists with cols 'time', 'responseobj' !
-		     [Date.now(),
-		     req.body.myresponse],
-    		     function(err, result){
-    			 if (err)
-    			 {console.error(err); res.send("Error " + err); } //For now the client just prints the error to the console. What's ideal?
-    			 else
-    			 { // response.render('pages/db', {results: result.rows});
-    			     res.send("success");
-    			 }
-    		     });//end query
-	done();
-    });
-    // pool shutdown
-    pool.end()
-});
-
-
-//experimenter-facing routes: login, see the data and usage stats.
 
 app.get("/getresponses",requireLogin,function(req,res){
     var pool = new pg.Pool({connectionString:process.env.DATABASE_URL});
@@ -173,69 +101,79 @@ app.get("/getdemographics",requireLogin,function(req,res){
 });
 
 
-// app.post('/loginhandler',function(req,res){
-// //save the response in db
-//     var pool = new pg.Pool(
-// 	{connectionString:process.env.DATABASE_URL}
-//     )    
-//     // connection using created pool
-//     pool.connect(function(err, client, done) {
-//     	client.query('select * from users where id=$1',
-// 		     [],
-//     		     function(err, result){
-//     			 done();
-//     			 if (err)
-//     			 {console.error(err); res.send("Error " + err); }
-//     			 else
-//     			 { // response.render('pages/db', {results: result.rows});
-// 			     if(result.rowCount==0){
-// 				 request.session.loginbounce=true;
-// 				 response.redirect("/"); //should go to login page
-//   				 return;
-//   			     }
-//   			     request.session.pwdmatch=result.rows[0].password==request.body.loginpwd;
-// 			     if(result.rows[0].password==request.body.loginpwd){
-// 				 //login success.
-// 			     }else{
-// 				 //login failure.
-// 			     }
-			     
-//     			 }
-//     		     });//end query
-// 	done()
-//     });
-//     // pool shutdown
-//     pool.end()
-// });
+
+//participant-facing routes for rending pages, including 'index'.
+app.get('/', function (req, res) {
+    res.render("pages/index");
+   
+})
+
+app.get('/run',function(req,res){
+    res.render("pages/exp");
+});
+app.post('/exp',function(req,res){
+    //not sure why this needs to bounce to a new route to render, but it does seem to. I need to learn some express!
+    return res.status(200).send("/run");    
+})
+
+app.get('/done',function(req,res){
+    res.render("pages/outro");
+});
+app.post('/finish',function(req,res){
+    return res.status(200).send("/done");//Another instance of the double-bounce to render. Why?
+});
+
+//Paricipant data-saving routes, push stuff to the database (but don't render new pages.)
+app.post('/demographics',function(req,res){
+//save the response in db
+    var pool = new pg.Pool(
+	{connectionString:process.env.DATABASE_URL}
+    )    
+    // connection using created pool
+    pool.connect(function(err, client, done) {
+    	client.query('insert into demographics values ($1, $2)', //Probably a crime to save a multi-value objs in one 'info' col. Oh well.
+		     [Date.now(),
+		     req.body.demographics],
+    		     function(err, result){
+    			 if (err)
+    			 {console.error(err); res.send("Error " + err); } //For now the client just prints the error to the console. What's ideal?
+    			 else
+    			 { // response.render('pages/db', {results: result.rows});
+    			     res.send("success");
+    			 }
+    		     });//end query
+	done();
+    });
+    pool.end()
+});
 
 
-//db template:
-// app.post('/dbquery',function(req,res){
-//     var pool = new pg.Pool(
-// 	{connectionString:process.env.DATABASE_URL}
-//     )    
-//     // connection using created pool
-//     pool.connect(function(err, client, done) {
-//     	client.query('select * from responses', //placeholder query. Assuming 'responses' exists. Remember to sanitize the real thing.
-//     		     function(err, result){
-//     			 done();
-//     			 if (err)
-//     			 {console.error(err); res.send("Error " + err); }
-//     			 else
-//     			 { // response.render('pages/db', {results: result.rows});
-//     			     res.send("success");
-//     			 }
-//     		     });//end query
-// 	done()
-//     });
-//     // pool shutdown
-//     pool.end()
-    
-//     console.log("qmanager"+req.body.qobj);//diag
-    
-// });
+app.post('/response',function(req,res){
+//save the response in db
+    var pool = new pg.Pool(
+	{connectionString:process.env.DATABASE_URL}
+    )    
+    // connection using created pool
+    pool.connect(function(err, client, done) {
+    	client.query('insert into responses values ($1,$2)', //NOTE this assumes table responses exists with cols 'time', 'responseobj' !
+		     [Date.now(),
+		     req.body.myresponse],
+    		     function(err, result){
+    			 if (err)
+    			 {console.error(err); res.send("Error " + err); } //For now the client just prints the error to the console. What's ideal?
+    			 else
+    			 { // response.render('pages/db', {results: result.rows});
+    			     res.send("success");
+    			 }
+    		     });//end query
+	done();
+    });
+    pool.end()
+});
 
 
+
+//Ok, run this thing!
 app.listen(app.get('port'), function() {
   console.log('Node app is running on port', app.get('port'));
 });

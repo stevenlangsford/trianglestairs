@@ -27,6 +27,7 @@
     "express": "^4.16.2",
     "helmet": "^3.9.0",
     "json2csv": "^3.11.5",
-    "pg": "6.x"
+    "pg": "6.x",
+    "serve-favicon": "^2.4.5"
   }
 }
