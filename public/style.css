@@ -24,3 +24,11 @@ p {
      border-radius:.5em;
      background-color:darkgrey;
  }
+
+ div{
+     display:flex;
+     justify-content:center;
+     padding:50px;
+     /* margin:0 auto; */
+     /* left:50%; */
+ }
