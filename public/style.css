@@ -10,7 +10,8 @@ h1 {
 }
 p {
     margin-left:auto;
-    margin-right:auto; 
+    margin-right:auto;
+    display:block;
  }
 
 .centered, trialdiv {
@@ -31,4 +32,15 @@ p {
      padding:50px;
      /* margin:0 auto; */
      /* left:50%; */
+ }
+
+ footer{
+     width:100%;
+     margin-left:auto;
+     margin-right:auto;
+     text-align:center;
+     position:fixed;
+     left:0;
+     bottom:0;
+     
  }

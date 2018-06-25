@@ -14,8 +14,10 @@
     <!-- predef html resources -->
     <div id="uberdiv" class='centered'>
       <h1>Thank you</h1>
-      <p>You're done!</p>
-      <p>Your completion code is:</br> <span id='completioncodespan'></span></p>
+    </div>
+          <div>You're done!</div>
+    <div>
+      <p>Your completion code is: <span id='completioncodespan'></span></p>
     </div>
 <script>
   var symbols = ["A","B","C","D","F","G","H","J","K","L","M","N","P","Q","R","S","T","V","W","X","Y","Z","1","2","3","4","5","6","7","8","9","1","2","3","4","5","6","7","8","9"];
@@ -23,7 +25,7 @@
   return symbols[Math.floor(Math.random()*symbols.length)]
   }
   function getCode(){
-  return "SD"+getSymbol()+getSymbol()+getSymbol()+"LL"+getSymbol()+getSymbol()+getSymbol()+getSymbol()+"4";//some fixed vals so bad codes pop out. Zero defence against malice but sometimes folks make mistakes or write messages in the submission box.
+  return "UM"+getSymbol()+getSymbol()+"SL"+getSymbol()+getSymbol()+getSymbol()+"1";//some fixed vals so bad codes pop out. Zero defence against malice but sometimes folks make mistakes or write messages in the submission box.
   }
       document.getElementById("completioncodespan").innerHTML=(getCode());
 </script>
