@@ -6,6 +6,7 @@ npm-debug.log
 *.env
 *.dev
 .DS_Store
+*.RData #Should all be reproducable from .csv and .r files, & if there are model fits they bloat fast!
 
 # Docker
 Dockerfile
