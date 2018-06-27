@@ -1,0 +1,15 @@
+library(tidyverse)
+
+viz.TClines <- function(atrialtype){
+TCtracker.df <- endorsement.df%>%filter(trialtype==atrialtype)%>%mutate(TCratio = choseTarg/(choseTarg+choseComp))
+return(
+    ggplot(TCtracker.df,aes(x=decoydist,y=TCratio,color=shapeflavour))+
+    geom_point()+
+    geom_line()+
+    theme_bw()+ggtitle(atrialtype)
+    )
+}                        
+
+for(atrialtype in unique(rawdata.df$trialtype)){
+    x11();print(viz.TClines(atrialtype));
+}

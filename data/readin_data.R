@@ -19,7 +19,7 @@ attnchecks.df <- rawdata.df%>%filter(trialtype=="win" & decoydist>=1.15)%>%group
 badID <- filter(attnchecks.df,correct<.8) ##Maybe also eliminate super fast responders?
 ##ggplot(rawdata.df)+geom_density(aes(x=trialtime,color=as.factor(ppntID)))+theme_bw()
 
-vis.trial <- function(rowid){
+viz.trial <- function(rowid){
     atrial = rawdata.df[rowid,]
     atrial$chosenX = atrial[,paste0("EastWest",(atrial[,"positionchosen"]+1))]
     atrial$chosenY = atrial[,paste0("NorthSouth",(atrial[,"positionchosen"]+1))]
