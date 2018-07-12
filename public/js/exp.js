@@ -184,7 +184,7 @@ function triangle(base,height,templatetype, orientation){
 	else return this.height;
     }
     
-    this.drawme = function(canvas){	
+    this.drawme = function(canvas){ //about to change this	
 	var leftmost = Math.min(this.x1,this.x2,this.x3);
 	var highest = Math.min(this.y1,this.y2,this.y3);
 	var rightmost = Math.max(this.x1,this.x2,this.x3);
