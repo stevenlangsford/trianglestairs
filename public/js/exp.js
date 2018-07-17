@@ -66,7 +66,7 @@ function nextTrial(){
 
 //****************************************************************************************************
 //housekeeping
-const canvassize = 150;
+const canvassize = 150*3;//roughly three max triangle widths. Which is more than you need 'cause they're in a circle not a line.
 
 function shuffle(a) { //credit SO
     var j, x, i;
@@ -92,7 +92,7 @@ function linelength(x1,y1,x2,y2){
 var drawtime = "init";
 function recordResponse(positionchosen,stimsummary,stimid){
     //TODO, save response and advance to next trial.
-    stimsummary = JSON.parse(stimsummary); //from JSON string back into an object. Because trying to return 'this' from the trialobj summary fn was terrifying, easier/safer to pass a string and reconstitute it here to add more attributes and pass to db as an object.
+    stimsummary = JSON.parse(stimsummary); //from JSON string back into an object. Because trying to return 'this' from the trialobj summary fn was terrifying, easier/safer to pass a string and reconstitute it here, add whatever response-recording attributes you want and then pass to db as an object.
 
     console.log(stimsummary.roles[stimsummary.presentation_position[positionchosen]]);
     
@@ -183,8 +183,20 @@ function triangle(base,height,templatetype, orientation){
 	if(this.orientation==0||this.orientation==2) return this.base;
 	else return this.height;
     }
+
+    this.drawoffset_x = function(){
+	if(this.orientation==0) return -this.EastWest()/2;
+	if(this.orientation==2) return this.EastWest()/2;
+	return 0;
+    }
+    this.drawoffset_y = function(){
+	if(this.orientation==1) return -this.NorthSouth()/2;
+	if(this.orientation==3) return this.NorthSouth()/2;
+	return 0;
+    }
+
     
-    this.drawme = function(canvas){ //about to change this	
+    this.drawme = function(canvas,shiftx,shifty,color){	
 	var leftmost = Math.min(this.x1,this.x2,this.x3);
 	var highest = Math.min(this.y1,this.y2,this.y3);
 	var rightmost = Math.max(this.x1,this.x2,this.x3);
@@ -192,12 +204,12 @@ function triangle(base,height,templatetype, orientation){
 	var width = rightmost-leftmost;
 	var height = lowest-highest;
 	
-	var shiftx = -leftmost+canvas.width/2-width/2 + (-5+20*Math.random());//center the shape & add jitter 
-	var shifty = canvas.height-lowest-canvas.height/2+height/2 + (-5+10*Math.random());
+//	var shiftx = -leftmost+canvas.width/2-width/2 + (-5+20*Math.random());//center the shape & add jitter 
+//	var shifty = canvas.height-lowest-canvas.height/2+height/2 + (-5+10*Math.random());
 
 	if (canvas.getContext) {
 	    var ctx = canvas.getContext('2d');
-	    
+	    ctx.fillStyle=color;
 	    ctx.beginPath();
 	    ctx.moveTo(this.x1+shiftx,this.y1+shifty);
 	    ctx.lineTo(this.x2+shiftx,this.y2+shifty);
@@ -207,13 +219,47 @@ function triangle(base,height,templatetype, orientation){
     }
 }//end triangle
 
+function pairtrialobj(triangles,stimid){
+    this.triangles = triangles;
+    this.presentation_position = shuffle([0,1])
+    this.hm_rotations=0;//shuffle([0,1,2,3])[0];
+    this.stimid = stimid;
+
+    for(var i=0;i<this.hm_rotations;i++){
+    	for(var j=0;j<this.triangles.length;j++)this.triangles[j]=this.triangles[j].cloneme().rotate90();//whee
+    }
+
+    this.drawme = function(targdiv){
+	drawtime=Date.now();
+	document.getElementById(targdiv).innerHTML = "<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
+	"<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td>"+
+	    "<td><canvas id='stimleft' width='"+canvassize/2+"' height='"+canvassize/2+"' style='border: 1px solid green;'></canvas></td>"+
+	    "<td><canvas id='stimright' width='"+canvassize/2+"' height='"+canvassize/2+"' style='border:1px solid yellow;'></canvas></td>"+
+	    "<td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
+
+	this.triangles[this.presentation_position[0]].drawme(document.getElementById('stimleft'),
+							     canvassize/5-this.triangles[this.presentation_position[0]].drawoffset_x(),
+							     canvassize/5-this.triangles[this.presentation_position[0]].drawoffset_y(),
+							     "black");
+	this.triangles[this.presentation_position[1]].drawme(document.getElementById('stimright'),
+							     canvassize/5-this.triangles[this.presentation_position[1]].EastWest()/4,
+							     canvassize/5-this.triangles[this.presentation_position[1]].NorthSouth()/4,
+							     "black");
+	
+		setTimeout(function(){for(var i=0;i<3;i++)document.getElementsByClassName("responsebutton")[i].disabled=false},1000)
+    }
+
+    this.summaryobj = function(){
+	return "todo";
+    }
+}
 
 function trialobj(triangles,roles,stimid,decoydist){ //responsible for drawing to screen, including randomization of locations and starting orientation. Also TODO here recording responses.
     this.triangles = triangles;
     this.roles = roles;
     this.presentation_position = shuffle([0,1,2]);
     this.stimid = stimid;
-    this.hm_rotations = 0//;shuffle([0,1,2,3])[0]; //canonical orientation is tall (N), randomize so NSEW versions all presented.
+    this.hm_rotations = shuffle([0,1,2,3])[0]; //canonical orientation is tall (N), randomize so NSEW versions all presented.
     this.decoydist = decoydist;
     
     for(var i=0;i<this.hm_rotations;i++){
@@ -221,21 +267,60 @@ function trialobj(triangles,roles,stimid,decoydist){ //responsible for drawing t
     }
 
     this.drawme = function(targdiv){
-	drawtime=Date.now();//public, visible to response-recording function. Which also records response time, so you have total view time.
-	document.getElementById(targdiv).innerHTML="<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
+	drawtime=Date.now();//public, visible to response-recording function. Which also records response time when hit, so between them you have total view time.
+	document.getElementById(targdiv).innerHTML = "<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
 	"<tr><td colspan='2' align='center' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
-	    "<tr><td colspan='2' align='center'>"+
-	    "<canvas id='canvas0"+stimid+"' width='"+canvassize+"' height='"+canvassize+"'></canvas>"+
-	    "</td></tr>"+
-	    "<tr>"+
-	    "<td align='center'>"+"<canvas id='canvas1"+stimid+"' width='"+canvassize+"' height='"+canvassize+"'></canvas>"+"</td>"+
-	    "<td align='center'>"+"<canvas id='canvas2"+stimid+"' width='"+canvassize+"' height='"+canvassize+"'></canvas>"+"</td>"+
-	    "</tr>"+
-	    "<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td> <td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('2','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
-	    "</table></br>";
-	for(var i=0;i<this.presentation_position.length;i++){
-	    triangles[this.presentation_position[i]].drawme(document.getElementById('canvas'+i+this.stimid));
-	}
+	    "<tr><td colspan='2' align='center'><canvas id='stimcanvas' width='"+canvassize+"' height='"+canvassize+"'></canvas></td></tr>"+
+	    "<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td><td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('2','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
+	//old table-based draw:
+	// document.getElementById(targdiv).innerHTML="<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
+	// "<tr><td colspan='2' align='center' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
+	//     "<tr><td colspan='2' align='center'>"+
+	//     "<canvas id='canvas0"+stimid+"' width='"+canvassize+"' height='"+canvassize+"'></canvas>"+
+	//     "</td></tr>"+
+	//     "<tr>"+
+	//     "<td align='center'>"+"<canvas id='canvas1"+stimid+"' width='"+canvassize+"' height='"+canvassize+"'></canvas>"+"</td>"+
+	//     "<td align='center'>"+"<canvas id='canvas2"+stimid+"' width='"+canvassize+"' height='"+canvassize+"'></canvas>"+"</td>"+
+	//     "</tr>"+
+	//     "<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td> <td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('2','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
+	//     "</table></br>";
+	
+	var d = canvassize/5; //distance apart
+	var jitter = 10; //jitter less critical now that there's no clear alignment issue, but might be nice mitigation of possible orientation dist-artifacts.
+	var rot_offset = Math.PI;
+	var center_x = canvassize/2;
+	var center_y = canvassize/2;
+
+
+	//in polar cords, position1 is (d,0)
+	//position 2 is (d, 2pi/3)
+	//position 3 is (d, 4pi/3)
+
+	// so pos 1 in rect cords is: d*cos(0),d*sin(0) = (d,0)
+	// pos 2 is d*cos(2pi/3), d*sin(2pi/3)
+	//pos 3 is d*cos(4pi/3), d*sin(4pi/3)
+	
+
+	this.triangles[this.presentation_position[0]].drawme(document.getElementById('stimcanvas'),
+							jitter*Math.random()+center_x+this.triangles[this.presentation_position[0]].drawoffset_x()+d,
+							jitter*Math.random()+center_y+this.triangles[this.presentation_position[0]].drawoffset_y(),
+						       "black");
+
+	this.triangles[this.presentation_position[1]].drawme(document.getElementById('stimcanvas'),
+							jitter*Math.random()+center_x+this.triangles[this.presentation_position[1]].drawoffset_x()+d*Math.cos(2.0/3.0*Math.PI),
+							jitter*Math.random()+center_y+this.triangles[this.presentation_position[1]].drawoffset_y()+d*Math.sin(2.0/3.0*Math.PI),
+						       "black");
+	
+	this.triangles[this.presentation_position[2]].drawme(document.getElementById('stimcanvas'),
+							jitter*Math.random()+center_x+this.triangles[this.presentation_position[2]].drawoffset_x()+d*Math.cos(4.0/3.0*Math.PI),
+							jitter*Math.random()+center_y+this.triangles[this.presentation_position[2]].drawoffset_y()+d*Math.sin(4.0/3.0*Math.PI),
+							"black"); //colors useful for diag/dev. Could also be used as a fun manipulation to do things to the similarity structure? Could be a fun companion study?
+	
+	//diag center pointer:
+	// var ctx = document.getElementById('stimcanvas').getContext('2d');
+	// ctx.fillStyle="black";
+	// ctx.fillRect(center_x,center_y,15,15)
+	//end diag
 
 	setTimeout(function(){for(var i=0;i<3;i++)document.getElementsByClassName("responsebutton")[i].disabled=false},1000)
     }// drawme
@@ -291,10 +376,20 @@ function trialgetter(x1,y1,x2,y2,x3,y3,shapetypes,roles,orientations,stimid,deco
 		       
 }
 
+function pairtrialgetter(x1,y1,x2,y2,template1,template2,stimid){
+    var scalefactor = 100;//check consistency with triad trials (converts between 'scale relative to canonical size of 1' and 'canvas pixels')
+    x1=x1*scalefactor;
+    x2=x2*scalefactor;
+    y1=y1*scalefactor;
+    y2=y2*scalefactor;
+    var mytriangles = [new triangle(x1,y1,template1,shuffle([0,1,2,3])),
+		       new triangle(x2,y2,template2,shuffle([0,1,2,3]))]
+    return new pairtrialobj(mytriangles,stimid);
+		       
+}
+var trials = shuffle([pairtrialgetter(1,1,1,1,"rightangle","equilateral","test1")]);
 
-var trials = shuffle(
-    [trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes000','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes001','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes010','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes100','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes012','0.95'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes000','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes001','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes010','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes100','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes012','0.9'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes000','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes001','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes010','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes100','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes012','0.85'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes000','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes001','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes010','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes100','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes012','-0.025'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes000','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes001','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes010','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes100','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes012','-0.05'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes000','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes001','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes010','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes100','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes012','-0.1'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes000','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes001','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes010','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes100','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes012','-0.15'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes000','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes001','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes010','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes100','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes012','1.05'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes000','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes001','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes010','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes100','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes012','1.1'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes000','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes001','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes010','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes100','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes012','1.15')]
-)//end shuffle stimlist
+    //shuffle([trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes000','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes001','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes010','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes100','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes012','0.95'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes000','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes001','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes010','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes100','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes012','0.9'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes000','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes001','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes010','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes100','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes012','0.85'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes000','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes001','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes010','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes100','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes012','-0.025'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes000','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes001','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes010','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes100','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes012','-0.05'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes000','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes001','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes010','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes100','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes012','-0.1'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes000','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes001','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes010','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes100','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes012','-0.15'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes000','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes001','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes010','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes100','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes012','1.05'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes000','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes001','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes010','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes100','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes012','1.1'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes000','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes001','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes010','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes100','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes012','1.15')])//end shuffle stimlist
 
 
 nextTrial();
