@@ -91,11 +91,8 @@ function linelength(x1,y1,x2,y2){
 
 var drawtime = "init";
 function recordResponse(positionchosen,stimsummary,stimid){
-    //TODO, save response and advance to next trial.
     stimsummary = JSON.parse(stimsummary); //from JSON string back into an object. Because trying to return 'this' from the trialobj summary fn was terrifying, easier/safer to pass a string and reconstitute it here, add whatever response-recording attributes you want and then pass to db as an object.
 
-    console.log(stimsummary.roles[stimsummary.presentation_position[positionchosen]]);
-    
     stimsummary.ppntID = localStorage.getItem("ppntID");//a random number generated (on page load) in admin.js. How reliable is this? Will some people turn off localstorage?
     stimsummary.positionchosen = positionchosen;
     stimsummary.rolechosen = stimsummary.roles[stimsummary.presentation_position[positionchosen]];
@@ -112,6 +109,26 @@ function recordResponse(positionchosen,stimsummary,stimid){
 	       }
 	      );
 }
+
+// function recordPairResponse(positionchosen,stimobj,stimid){ //Ooh this doubling up gonna make the software gods angry! That's what you get for adding new stim types late in the day.
+
+//         stimsummary = JSON.parse(stimsummary); //from JSON string back into an object. Because trying to return 'this' from the trialobj summary fn was terrifying, easier/safer to pass a string and reconstitute it here, add whatever response-recording attributes you want and then pass to db as an object.
+
+//     stimsummary.ppntID = localStorage.getItem("ppntID");//a random number generated (on page load) in admin.js. How reliable is this? Will some people turn off localstorage?
+//     stimsummary.positionchosen = positionchosen;
+// //    stimsummary.rolechosen = stimsummary.roles[stimsummary.presentation_position[positionchosen]]; //this makes no sense for pairs
+//     stimsummary.drawtime = drawtime; //public var set by triangle.drawme
+//     stimsummary.responsetime = Date.now(); //will probably match the time recorded in response db table.
+//     stimsummary.presentationsequence = trialindex;
+//     nextTrial();
+
+//     	$.post("/response",{myresponse:JSON.stringify(stimsummary)},
+// 	       function(success){
+// 		   console.log(success);//probably 'success', might be an error
+// 		   //Note potential error not handled at all. Hah.
+// 	       }
+// 	      );
+// }
 
 //stim template. Can rotate, stretch height or width, & dilate
 function triangle(base,height,templatetype, orientation){
@@ -184,18 +201,27 @@ function triangle(base,height,templatetype, orientation){
 	else return this.height;
     }
 
-    this.drawoffset_x = function(){
-	if(this.orientation==0) return -this.EastWest()/2;
-	if(this.orientation==2) return this.EastWest()/2;
-	return 0;
+    // this.drawoffset_x = function(){
+    // 	var leftmost = Math.min(this.x1,this.x2,this.x3);
+    // 	var rightmost = Math.max(this.x1,this.x2,this.x3);
+	
+    // 	if(this.orientation==0) return -this.EastWest()/2;
+    // 	if(this.orientation==2) return this.EastWest()/2;
+    // 	return 0;
+    // }
+    // this.drawoffset_y = function(){
+    // 	if(this.orientation==1) return -this.NorthSouth()/2;
+    // 	if(this.orientation==3) return this.NorthSouth()/2;
+    // 	return 0;
+    // }
+
+    this.leftmost = function(){
+	return	Math.min(this.x1,this.x2,this.x3);
     }
-    this.drawoffset_y = function(){
-	if(this.orientation==1) return -this.NorthSouth()/2;
-	if(this.orientation==3) return this.NorthSouth()/2;
-	return 0;
+    this.lowest = function(){
+	return	Math.max(this.y1,this.y2,this.y3);
     }
 
-    
     this.drawme = function(canvas,shiftx,shifty,color){	
 	var leftmost = Math.min(this.x1,this.x2,this.x3);
 	var highest = Math.min(this.y1,this.y2,this.y3);
@@ -222,7 +248,7 @@ function triangle(base,height,templatetype, orientation){
 function pairtrialobj(triangles,stimid){
     this.triangles = triangles;
     this.presentation_position = shuffle([0,1])
-    this.hm_rotations=0;//shuffle([0,1,2,3])[0];
+    this.hm_rotations=shuffle([0,1,2,3])[0];
     this.stimid = stimid;
 
     for(var i=0;i<this.hm_rotations;i++){
@@ -233,24 +259,38 @@ function pairtrialobj(triangles,stimid){
 	drawtime=Date.now();
 	document.getElementById(targdiv).innerHTML = "<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
 	"<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td>"+
-	    "<td><canvas id='stimleft' width='"+canvassize/2+"' height='"+canvassize/2+"' style='border: 1px solid green;'></canvas></td>"+
-	    "<td><canvas id='stimright' width='"+canvassize/2+"' height='"+canvassize/2+"' style='border:1px solid yellow;'></canvas></td>"+
+	    "<td><canvas id='stimleft' width='"+canvassize/2+"' height='"+canvassize/2+"'></canvas></td>"+
+	    "<td><canvas id='stimright' width='"+canvassize/2+"' height='"+canvassize/2+"'></canvas></td>"+
 	    "<td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
 
-	this.triangles[this.presentation_position[0]].drawme(document.getElementById('stimleft'),
-							     canvassize/5-this.triangles[this.presentation_position[0]].drawoffset_x(),
-							     canvassize/5-this.triangles[this.presentation_position[0]].drawoffset_y(),
+	var leftcanvas = document.getElementById('stimleft');
+	var rightcanvas = document.getElementById('stimright');
+	var jitter = 10;
+	this.triangles[this.presentation_position[0]].drawme(leftcanvas,
+							     leftcanvas.width/2-this.triangles[this.presentation_position[0]].leftmost()/2+Math.random()*jitter-jitter/2,
+							     leftcanvas.height/2-this.triangles[this.presentation_position[0]].lowest()/2+Math.random()*jitter-jitter/2,
 							     "black");
-	this.triangles[this.presentation_position[1]].drawme(document.getElementById('stimright'),
-							     canvassize/5-this.triangles[this.presentation_position[1]].EastWest()/4,
-							     canvassize/5-this.triangles[this.presentation_position[1]].NorthSouth()/4,
+	this.triangles[this.presentation_position[1]].drawme(rightcanvas,
+							     rightcanvas.width/2-this.triangles[this.presentation_position[1]].leftmost()/2+Math.random()*jitter-jitter/2,
+							     rightcanvas.height/2-this.triangles[this.presentation_position[1]].lowest()/2+Math.random()*jitter-jitter/2,
 							     "black");
 	
-		setTimeout(function(){for(var i=0;i<3;i++)document.getElementsByClassName("responsebutton")[i].disabled=false},1000)
+	setTimeout(function(){
+	    var responsebuttons = document.getElementsByClassName("responsebutton");
+	    for(var i=0;i<responsebuttons.length;i++)responsebuttons[i].disabled=false;
+	},1000)
     }
 
     this.summaryobj = function(){
-	return "todo";
+	this.area1 = this.triangles[0].area();
+	this.area2 = this.triangles[1].area();
+	this.template1 = this.triangles[0].templatetype;
+	this.template2 = this.triangles[1].templatetype;
+	this.orientation1 = this.triangles[0].orientation;
+	this.orientation2 = this.triangles[1].orientation;
+	this.presentedonleft = this.presentation_position[0];
+	this.roles = ["pairtrial","pairtrial"]; //this filler makes this summaryobj compatible with the record-response fn for triads.
+	return JSON.stringify(this);
     }
 }
 
@@ -302,18 +342,18 @@ function trialobj(triangles,roles,stimid,decoydist){ //responsible for drawing t
 	
 
 	this.triangles[this.presentation_position[0]].drawme(document.getElementById('stimcanvas'),
-							jitter*Math.random()+center_x+this.triangles[this.presentation_position[0]].drawoffset_x()+d,
-							jitter*Math.random()+center_y+this.triangles[this.presentation_position[0]].drawoffset_y(),
+							jitter*Math.random()-jitter/2+center_x+this.triangles[this.presentation_position[0]].drawoffset_x()+d,
+							jitter*Math.random()-jitter/2+center_y+this.triangles[this.presentation_position[0]].drawoffset_y(),
 						       "black");
 
 	this.triangles[this.presentation_position[1]].drawme(document.getElementById('stimcanvas'),
-							jitter*Math.random()+center_x+this.triangles[this.presentation_position[1]].drawoffset_x()+d*Math.cos(2.0/3.0*Math.PI),
-							jitter*Math.random()+center_y+this.triangles[this.presentation_position[1]].drawoffset_y()+d*Math.sin(2.0/3.0*Math.PI),
+							jitter*Math.random()-jitter/2+center_x+this.triangles[this.presentation_position[1]].drawoffset_x()+d*Math.cos(2.0/3.0*Math.PI),
+							jitter*Math.random()-jitter/2+center_y+this.triangles[this.presentation_position[1]].drawoffset_y()+d*Math.sin(2.0/3.0*Math.PI),
 						       "black");
 	
 	this.triangles[this.presentation_position[2]].drawme(document.getElementById('stimcanvas'),
-							jitter*Math.random()+center_x+this.triangles[this.presentation_position[2]].drawoffset_x()+d*Math.cos(4.0/3.0*Math.PI),
-							jitter*Math.random()+center_y+this.triangles[this.presentation_position[2]].drawoffset_y()+d*Math.sin(4.0/3.0*Math.PI),
+							jitter*Math.random()-jitter/2+center_x+this.triangles[this.presentation_position[2]].drawoffset_x()+d*Math.cos(4.0/3.0*Math.PI),
+							jitter*Math.random()-jitter/2+center_y+this.triangles[this.presentation_position[2]].drawoffset_y()+d*Math.sin(4.0/3.0*Math.PI),
 							"black"); //colors useful for diag/dev. Could also be used as a fun manipulation to do things to the similarity structure? Could be a fun companion study?
 	
 	//diag center pointer:
