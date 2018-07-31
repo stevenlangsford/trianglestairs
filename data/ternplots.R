@@ -1,0 +1,13 @@
+library(vcd)
+rm(list=ls())
+source("readin_data.R")
+
+data.df <- filter(endorsement.df,trialtype=="win")
+##data.frame(shapeflavors=c("000","001","010"),decoy.type=c("a","a","b"),prop_targ=c(.9,.8,.7),prop_comp=c(.01,.1,.15),prop_decoy=c(.09,.1,.15))
+with(data.df,{
+    colors <- c('red','green','blue','yellow','black')
+    ternaryplot(data.df[,c("targProp","compProp","decoyProp")],
+                pch=as.numeric(as.factor(as.character(decoydist))),
+                col=as.numeric(data.df$shapeflavour),
+                main="demo.df")
+})

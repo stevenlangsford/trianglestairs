@@ -1,24 +1,39 @@
 library(tidyverse)
 rm(list=ls())
-rawdata.df <- read.csv("responsedata.csv",header=TRUE)
-demographics.df <- read.csv("demographicsdata.csv",header=TRUE)
+rawdata.df <- read.csv("raw_data/responsedata.csv",header=TRUE)
+demographics.df <- read.csv("raw_data/demographicsdata.csv",header=TRUE)
 ##stimplot: you need: the ns and ew of each triangle, which one was chosen, and their shapetype
 
+pairs.df <- filter(rawdata.df,NorthSouth3=="pairtrial")#new bit
+pairs.df$areachosen <- with(pairs.df,
+                           ifelse(positionchosen==0, ifelse(presentation1==0,area1,area2), ifelse(presentation1==1,area2,area1)))#ugh!
+rawdata.df <- filter(rawdata.df,NorthSouth3!="pairtrial") #pull out pairs and procede as before. Ugly but accomodates late trial-type addition.
+#These numeric cols are forced to factors by 'pairtrial' placeholders. The placeholders are useful, so just convert back as needed? Ugh.
+rawdata.df$area3 <- as.numeric(as.character(rawdata.df$area3))
+rawdata.df$NorthSouth3 <- as.numeric(as.character(rawdata.df$NorthSouth3))
+rawdata.df$EastWest3 <- as.numeric(as.character(rawdata.df$EastWest3))
+rawdata.df$orientation3 <- as.integer(as.character(rawdata.df$orientation3))
+rawdata.df$presentation3 <- as.integer(as.character(rawdata.df$presentation3))
+
+    
 ##derived data:
 rawdata.df$trialtype = substr(rawdata.df$stimid,1,3)
 rawdata.df$stimid <- as.character(rawdata.df$stimid)
 rawdata.df$shapeflavour = substr(rawdata.df$stimid,nchar(rawdata.df$stimid)-2,nchar(rawdata.df$stimid)) #ASSUMES stimid format with shape-flavor on the end! ouch. Can check for consistency with templatetype
 rawdata.df$trialtime <- with(rawdata.df,responsetime-drawtime)
 
-endorsement.df <- rawdata.df%>%group_by(stimid,trialtype,decoydist,shapeflavour)%>%
-    summarize(choseTarg=sum(rolechosen=="targ"), choseComp=sum(rolechosen=="comp"),choseDecoy=sum(rolechosen=="decoy"))%>%
-    ungroup()
-
-##attention checks?
+##attention checks? Note no filtering done here at the moment: still need to filter on badID.
 attnchecks.df <- rawdata.df%>%filter(trialtype=="win" & decoydist>=1.15)%>%group_by(ppntID)%>%summarize(correct=sum(rolechosen=="decoy")/n())
 badID <- filter(attnchecks.df,correct<.8) ##Maybe also eliminate super fast responders?
 ##ggplot(rawdata.df)+geom_density(aes(x=trialtime,color=as.factor(ppntID)))+theme_bw()
 
+hm_ppnts <- length(unique(rawdata.df$ppntID))
+
+endorsement.df <- rawdata.df%>%group_by(stimid,trialtype,decoydist,shapeflavour)%>%
+    summarize(choseTarg=sum(rolechosen=="targ"), choseComp=sum(rolechosen=="comp"),choseDecoy=sum(rolechosen=="decoy"))%>%
+    ungroup()%>%mutate(targProp=choseTarg/hm_ppnts,compProp=choseComp/hm_ppnts,decoyProp=choseDecoy/hm_ppnts)
+
+##some init plotting stuff:
 viz.trial <- function(rowid){
     atrial = rawdata.df[rowid,]
     atrial$chosenX = atrial[,paste0("EastWest",(atrial[,"positionchosen"]+1))]
@@ -54,9 +69,9 @@ return(
     )
 }                        
 
-for(atrialtype in unique(rawdata.df$trialtype)){
-    x11();print(viz.TClines(atrialtype));
-}
+## for(atrialtype in unique(rawdata.df$trialtype)){
+##     x11();print(viz.TClines(atrialtype));
+## }
 
 
 ## library("Ternary") ##ugh. Well, learn to use this or wait for ggtern/ggplot2 compatibility fix to come through?

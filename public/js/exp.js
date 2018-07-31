@@ -4,7 +4,7 @@
 
 // var trials = [];
  var trialindex = 0;
-
+var maxtrials = 10;//70?
 // function responseListener(aresponse){//global so it'll be just sitting here available for the trial objects to use. So, it must accept whatever they're passing.
 // //    console.log("responseListener heard: "+aresponse); //diag
 //     trials[trialindex].response = aresponse;
@@ -20,10 +20,11 @@
 // }
 
 function nextTrial(){
-    if(trialindex<trials.length){
-	trials[trialindex].drawme("uberdiv");
+    if(trialindex<maxtrials){
+	shuffle(allmanagers);
+	allmanagers[0].nextTrial().drawme("uberdiv");
 	trialindex++;
-	document.getElementById("expfooter").innerHTML="<p>Trial "+trialindex+" of "+trials.length; //after trialindex++ so as if 1 indexed.
+	document.getElementById("expfooter").innerHTML="<p>Trial "+trialindex+" of "+maxtrials; //after trialindex++ so as if 1 indexed.
     }else{
 	$.post("/finish",function(data){window.location.replace(data)});
     }
@@ -91,44 +92,31 @@ function linelength(x1,y1,x2,y2){
 
 var drawtime = "init";
 function recordResponse(positionchosen,stimsummary,stimid){
-    stimsummary = JSON.parse(stimsummary); //from JSON string back into an object. Because trying to return 'this' from the trialobj summary fn was terrifying, easier/safer to pass a string and reconstitute it here, add whatever response-recording attributes you want and then pass to db as an object.
+    var mytrial = allmanagers[0].getcurrent();
+    var rolechosen = mytrial.roles[mytrial.presentation_position[positionchosen]]; //means "get the role corresponding to the thing presented at the position clicked."
+    console.log(positionchosen);
+    console.log(rolechosen);
+    console.log(mytrial.presentation_position);
+    
+    // stimsummary = JSON.parse(stimsummary); //from JSON string back into an object. Because trying to return 'this' from the trialobj summary fn was terrifying, easier/safer to pass a string and reconstitute it here, add whatever response-recording attributes you want and then pass to db as an object.
 
-    stimsummary.ppntID = localStorage.getItem("ppntID");//a random number generated (on page load) in admin.js. How reliable is this? Will some people turn off localstorage?
-    stimsummary.positionchosen = positionchosen;
-    stimsummary.rolechosen = stimsummary.roles[stimsummary.presentation_position[positionchosen]];
-    stimsummary.drawtime = drawtime; //public var set by triangle.drawme
-    stimsummary.responsetime = Date.now(); //will probably match the time recorded in response db table.
-    stimsummary.presentationsequence = trialindex;
-    nextTrial();
+    // stimsummary.ppntID = localStorage.getItem("ppntID");//a random number generated (on page load) in admin.js. How reliable is this? Will some people turn off localstorage?
+    // stimsummary.positionchosen = positionchosen;
+    // stimsummary.rolechosen = stimsummary.roles[stimsummary.presentation_position[positionchosen]];
+    // stimsummary.drawtime = drawtime; //public var set by triangle.drawme
+    // stimsummary.responsetime = Date.now(); //will probably match the time recorded in response db table.
+    // stimsummary.presentationsequence = trialindex;
+    
+//    nextTrial(); //call by hand when you're done inspecting them results in the console.
 
 //save to db
-    	$.post("/response",{myresponse:JSON.stringify(stimsummary)},
-	       function(success){
-		   console.log(success);//probably 'success', might be an error
-		   //Note potential error not handled at all. Hah.
-	       }
-	      );
+    	// $.post("/response",{myresponse:JSON.stringify(stimsummary)},
+	//        function(success){
+	// 	   console.log(success);//probably 'success', might be an error
+	// 	   //Note potential error not handled at all. Hah.
+	//        }
+	//       );
 }
-
-// function recordPairResponse(positionchosen,stimobj,stimid){ //Ooh this doubling up gonna make the software gods angry! That's what you get for adding new stim types late in the day.
-
-//         stimsummary = JSON.parse(stimsummary); //from JSON string back into an object. Because trying to return 'this' from the trialobj summary fn was terrifying, easier/safer to pass a string and reconstitute it here, add whatever response-recording attributes you want and then pass to db as an object.
-
-//     stimsummary.ppntID = localStorage.getItem("ppntID");//a random number generated (on page load) in admin.js. How reliable is this? Will some people turn off localstorage?
-//     stimsummary.positionchosen = positionchosen;
-// //    stimsummary.rolechosen = stimsummary.roles[stimsummary.presentation_position[positionchosen]]; //this makes no sense for pairs
-//     stimsummary.drawtime = drawtime; //public var set by triangle.drawme
-//     stimsummary.responsetime = Date.now(); //will probably match the time recorded in response db table.
-//     stimsummary.presentationsequence = trialindex;
-//     nextTrial();
-
-//     	$.post("/response",{myresponse:JSON.stringify(stimsummary)},
-// 	       function(success){
-// 		   console.log(success);//probably 'success', might be an error
-// 		   //Note potential error not handled at all. Hah.
-// 	       }
-// 	      );
-// }
 
 //stim template. Can rotate, stretch height or width, & dilate
 function triangle(base,height,templatetype, orientation){
@@ -201,19 +189,19 @@ function triangle(base,height,templatetype, orientation){
 	else return this.height;
     }
 
-    // this.drawoffset_x = function(){
-    // 	var leftmost = Math.min(this.x1,this.x2,this.x3);
-    // 	var rightmost = Math.max(this.x1,this.x2,this.x3);
+    this.drawoffset_x = function(){
+    	var leftmost = Math.min(this.x1,this.x2,this.x3);
+    	var rightmost = Math.max(this.x1,this.x2,this.x3);
 	
-    // 	if(this.orientation==0) return -this.EastWest()/2;
-    // 	if(this.orientation==2) return this.EastWest()/2;
-    // 	return 0;
-    // }
-    // this.drawoffset_y = function(){
-    // 	if(this.orientation==1) return -this.NorthSouth()/2;
-    // 	if(this.orientation==3) return this.NorthSouth()/2;
-    // 	return 0;
-    // }
+    	if(this.orientation==0) return -this.EastWest()/2;
+    	if(this.orientation==2) return this.EastWest()/2;
+    	return 0;
+    }
+    this.drawoffset_y = function(){
+    	if(this.orientation==1) return -this.NorthSouth()/2;
+    	if(this.orientation==3) return this.NorthSouth()/2;
+    	return 0;
+    }
 
     this.leftmost = function(){
 	return	Math.min(this.x1,this.x2,this.x3);
@@ -282,15 +270,44 @@ function pairtrialobj(triangles,stimid){
     }
 
     this.summaryobj = function(){
-	this.area1 = this.triangles[0].area();
-	this.area2 = this.triangles[1].area();
-	this.template1 = this.triangles[0].templatetype;
-	this.template2 = this.triangles[1].templatetype;
-	this.orientation1 = this.triangles[0].orientation;
-	this.orientation2 = this.triangles[1].orientation;
-	this.presentedonleft = this.presentation_position[0];
-	this.roles = ["pairtrial","pairtrial"]; //this filler makes this summaryobj compatible with the record-response fn for triads.
-	return JSON.stringify(this);
+	//copies the earlier summaryobj for triads so that you can save responses to the same db table. This is kinda dumb, but it's true that you can't mix response formats. Correct solution would be to give pairs their own table!
+	this.roles = [this.triangles[this.presentation_position[0]].templatetype,this.triangles[this.presentation_position[1]].templatetype]; //would be targ, comp, decoy in a triad.
+	this.area1 = this.triangles[0].area()
+	this.area2 = this.triangles[1].area()
+	this.area3 = "pairtrial"//this.triangles[2].area()
+
+	this.NorthSouth1 = this.triangles[0].NorthSouth()
+	this.NorthSouth2 = this.triangles[1].NorthSouth()
+	this.NorthSouth3 = "pairtrial"//this.triangles[2].NorthSouth()
+
+	this.EastWest1 = this.triangles[0].EastWest()
+	this.EastWest2 = this.triangles[1].EastWest()
+	this.EastWest3 = "pairtrial"//this.triangles[2].EastWest()
+
+	this.orientation1 = this.triangles[0].orientation
+	this.orientation2 = this.triangles[1].orientation
+	this.orientation3 = "pairtrial"//this.triangles[2].orientation
+
+	this.templatetype1 = this.triangles[0].templatetype
+	this.templatetype2 = this.triangles[1].templatetype
+	this.templatetype3 ="pairtrial"// this.triangles[2].templatetype
+
+	this.presentation1 = this.presentation_position[0];
+	this.presentation2 = this.presentation_position[1];
+	this.presentation3 ="pairtrial"// this.presentation_position[2];
+
+	return(JSON.stringify(this)); //could mess with this if it's convenient? This seems like a nice conservative way to get everything though.
+
+	//old pairs summaryobj: didn't match triads one, so only the cols they have in common got saved. Whups.	
+	// this.area1 = this.triangles[0].area();
+	// this.area2 = this.triangles[1].area();
+	// this.template1 = this.triangles[0].templatetype;
+	// this.template2 = this.triangles[1].templatetype;
+	// this.orientation1 = this.triangles[0].orientation;
+	// this.orientation2 = this.triangles[1].orientation;
+	// this.presentedonleft = this.presentation_position[0];
+	// this.roles = ["pairtrial","pairtrial"]; //this filler makes this summaryobj compatible with the record-response fn for triads.
+	// return JSON.stringify(this);
     }
 }
 
@@ -309,9 +326,9 @@ function trialobj(triangles,roles,stimid,decoydist){ //responsible for drawing t
     this.drawme = function(targdiv){
 	drawtime=Date.now();//public, visible to response-recording function. Which also records response time when hit, so between them you have total view time.
 	document.getElementById(targdiv).innerHTML = "<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
-	"<tr><td colspan='2' align='center' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
+	"<tr><td colspan='2' align='center' class='buttontd'><button class='responsebutton' onclick=recordResponse('2','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
 	    "<tr><td colspan='2' align='center'><canvas id='stimcanvas' width='"+canvassize+"' height='"+canvassize+"'></canvas></td></tr>"+
-	    "<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td><td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('2','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
+	    "<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td><td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
 	//old table-based draw:
 	// document.getElementById(targdiv).innerHTML="<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
 	// "<tr><td colspan='2' align='center' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
@@ -427,9 +444,65 @@ function pairtrialgetter(x1,y1,x2,y2,template1,template2,stimid){
     return new pairtrialobj(mytriangles,stimid);
 		       
 }
-var trials = shuffle([pairtrialgetter(1,1,1,1,"rightangle","equilateral","test1")]);
 
-    //shuffle([trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes000','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes001','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes010','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes100','0.95'),trialgetter(1,0.5,1,0.5,0.974679434480896,0.487339717240448,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.95shapes012','0.95'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes000','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes001','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes010','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes100','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes012','0.9'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes000','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes001','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes010','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes100','0.85'),trialgetter(1,0.5,1,0.5,0.921954445729289,0.460977222864644,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.85shapes012','0.85'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes000','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes001','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes010','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes100','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes012','-0.025'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes000','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes001','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes010','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes100','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes012','-0.05'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes000','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes001','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes010','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes100','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes012','-0.1'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes000','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes001','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes010','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes100','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes012','-0.15'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes000','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes001','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes010','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes100','1.05'),trialgetter(1,0.5,1,0.5,1.02469507659596,0.51234753829798,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.05shapes012','1.05'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes000','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes001','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes010','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes100','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes012','1.1'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes000','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes001','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes010','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes100','1.15'),trialgetter(1,0.5,1,0.5,1.07238052947636,0.53619026473818,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.15shapes012','1.15')])//end shuffle stimlist
+//MAIN: exp stim setup starts here.
 
+//DIADS
+// var trials = [];
+// //add diad stim (to check template impact)
+// var templatelist = ["rightangle","equilateral","skew"];
+// var sizediffs = [.9,1,1.1]; //one option size 1, other option this size. 1-1 comparison is important!
+// for(var i=0;i<templatelist.length;i++){
+//     for(var j=0;j<templatelist.length;j++){
+// 	for(var whichsize=0;whichsize<sizediffs.length;whichsize++){
+// 	    if(i==j&&sizediffs[whichsize]==1)continue;//same template diff sizes gives (some) accuracy info, but same template same size is boring.
+// 	    trials.push(pairtrialgetter(1,1,sizediffs[whichsize],sizediffs[whichsize],templatelist[i],templatelist[j],"pair"+templatelist[i]+"vs"+templatelist[j]+"_"+sizediffs[whichsize]));
+// 	}
+//     }
+// }
+//END DIADS
+
+//Triads:
+
+//trialgetter args are: trialgetter(x1,y1,x2,y2,x3,y3,shapetypes,roles,orientations,stimid,decoydist)
+
+//possible flavors are:
+
+var get_trialmanager = function(myflavor){
+    this.id = "tm"+myflavor.join("");
+    this.flavor = myflavor;
+    this.decoydistance = .4;
+    this.direction = -1;
+    this.history = [];
+    this.stepsize = .1;
+    this.getcurrent = function(){
+	return this.history[this.history.length-1];
+    }
+    this.nextTrial = function(){
+	var newtrial = trialgetter(1,.5,1,.5,Math.sqrt(this.decoydistance)*1,Math.sqrt(this.decoydistance)*.5,myflavor,['targ','comp','decoy'],['0','1','0'],this.id+"_"+history.length,this.decoydistance);
+	this.history.push(newtrial);
+	return newtrial;
+    }
+    // this.trialhistory = [];
+    // this.distancehistory = [];
+    // this.choicehistory = []; //?    
+}
+
+var allmanagers = [];
+var flavors = [
+    [0,0,0],
+    [0,0,1],
+    [0,1,0],
+    [1,0,0],
+    [0,1,2]
+]
+for(var i=0;i<flavors.length;i++){
+    allmanagers.push(new get_trialmanager(flavors[i]))
+}
+
+//Go!
+// var trials = []
+// for(var i=0;i<triads.length;i++)trials.push(triads[i])
+// shuffle(trials);
 
 nextTrial();

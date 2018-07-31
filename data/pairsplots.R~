@@ -1,0 +1,4 @@
+rm(list=ls())
+source("readin_data.R")
+
+ggplot(pairs.df,aes(x=rolechosen))+geom_bar()+theme_bw()#maybe this is all you really need?

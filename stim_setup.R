@@ -15,7 +15,7 @@ library(tidyverse)
 
 ##SO: CURRENT DESIGN PITCH
 ##RF decoys only because decoy type is a distraction.
-## 5,10,15% decoy distances (x5 shapeflavors, orientations randomized)
+## 5,10,15% decoy distances (x5 shapeflavors, orientations randomized) ##Update: these look too hard, doubled 'em to 10,20,30.
 ##attraction, similarity, and compromise effects.
 ##absolute sizes in the low three digit px range.
 
@@ -104,7 +104,7 @@ stimlist <- c()#write to demostim.txt as a js array -> human-viewable format
 stim.df <- data.frame()#write to demostim.csv as a data frame -> stan friendly format
 
 ##Attraction/similarity trials:seems ok
-for(decoydist in c(0.95,0.9,0.85)){#5,10,15% gap on decoys
+for(decoydist in c(.9,.8,.7)){# was: c(0.95,0.9,0.85)){#5,10,15% gap on decoys
     for(shapeflavor in list(c(0,0,0),c(0,0,1),c(0,1,0),c(1,0,0),c(0,1,2))){
         targ <-  get_target()
         decoy <- get_decoy(targ,decoydist)
@@ -127,7 +127,7 @@ for(slidedist in c(-.025,-.05,-.1,-.15)){
     }
 }
 
-for(winnermargin in c(1.05, 1.1, 1.15)){
+for(winnermargin in c(1.1, 1.2, 1.3)){
     for(shapeflavor in list(c(0,0,0),c(0,0,1),c(0,1,0),c(1,0,0),c(0,1,2))){
     targ <- get_target()
     decoy <- get_decoy(targ, winnermargin)

@@ -5,7 +5,7 @@ var dev = true; //could consider putting this in localStorage too, in case you w
 var instructionindex = 0;
 var instructionlist = [dev ? "Development version: <button onclick='startExp()'>Skip instructions</button>" : "Hii! These are the instructions. Please read them carefully, there will be a short quiz at the end.", "This is part of a study being run by [INSTITUTION]. By clicking 'Next', you are agreeing to take part in it. You should know that you're free to withdraw at any time (although you'll only be paid on completion), and that although data gained from this study may be published, you will not be identified and your personal details will not be divulged, nor will anything be linked to your [RELEVANT ID].</br><span style=\"font-size:.8em\">Please direct any questions about this study to the principle investigator, [NAME:CONTACT]. For any questions regarding the ethics of the study, please contact the convener of the Subcommittee for Human Research in the School of Psychology at [INSTITUTION, NAME, CONTACT].</span>","This study takes about [TIME] minutes, please only continue if you have [TIME] free without interruptions.",
 
-		       "This study will ask you to choose the largest of three triangles.","For this study, largest means largest area. You can judge the area of a triangle by looking at its width and height. The area is one half width times height","We're not asking you to take measurements though! We're most interested in your first impressions","Some of the trials will be easy, with one triangle clearly the largest, others will be more difficult, with similarly-sized triangles","For each trial, indicate which triangle is largest by clicking on the button closest to it.","That's all there is to it!"]
+		       "This study will ask you to choose the largest triangle out of a collection of triangles.","For this study, largest means largest area. You can judge the area of a triangle by looking at its width and height. The area is one half width times height","We're not asking you to take measurements though! We're most interested in your first impressions","Sometimes there will be two triangles to choose from, sometimes three.","In each trial, indicate which triangle is largest by clicking on the button closest to it.","Some of the trials will be easy, with one triangle clearly the largest, others will be difficult, with similarly-sized triangles"]
 
 function nextInstructions(){
     var nextButton = "<button id='nextbutton' onclick='nextInstructions()'>Next</button>"
@@ -23,7 +23,7 @@ function quiz(){
 	"<strong>Which of these is the best description of the task?</strong></br>"+
 	"<input type='radio' name='q1' id='q1a' value='a'>&nbsp You're drawing the largest triangle you can inside a boundary.<br/>"+
 	"<input type='radio' name='q1' id='q1b' value='b'>&nbsp You're indicating the largest out of a triangle, square, and a circle.<br/>"+
-	"<input type='radio' name='q1' id='q1c' value='c'>&nbsp You're indicating which of three triangles is largest.<br/>"+
+	"<input type='radio' name='q1' id='q1c' value='c'>&nbsp You're indicating which of the triangles is largest.<br/>"+
 	"<input type='radio' name='q1' id='q1d' value='d'>&nbsp You're indicating the location of a large triangle in a series of photographs.<br/>"+
 	"</span>"+
 	"<span style='text-align:left'><p>"+
