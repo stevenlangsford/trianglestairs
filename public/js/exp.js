@@ -3,28 +3,22 @@
 // //then put a list of trial-property-setter entries in 'stim' and you're golden.
 
 // var trials = [];
- var trialindex = 0;
-var maxtrials = 10;//70?
-// function responseListener(aresponse){//global so it'll be just sitting here available for the trial objects to use. So, it must accept whatever they're passing.
-// //    console.log("responseListener heard: "+aresponse); //diag
-//     trials[trialindex].response = aresponse;
-//     trials[trialindex].responseTime= Date.now();
-    
-//     $.post('/response',{myresponse:JSON.stringify(trials[trialindex])},function(success){
-//     	console.log(success);//For now server returns the string "success" for success, otherwise error message.
-//     });
-    
-//     //can put this inside the success callback, if the next trial depends on some server-side info.
-//     trialindex++; //increment index here at the last possible minute before drawing the next trial, so trials[trialindex] always refers to the current trial.
-//     nextTrial();
-// }
+var trialindex = 0;
+var diadindex = 0;
+var maxtrials = 100;//70?
+
 
 function nextTrial(){
     if(trialindex<maxtrials){
+	if(Math.random()<.2&&diadindex<trials.length){//about 1 in 5 or until they run out.
+	    trials[diadindex].drawme("uberdiv");
+	    diadindex++;
+	}else{
 	shuffle(allmanagers);
 	allmanagers[0].nextTrial().drawme("uberdiv");
+	    document.getElementById("expfooter").innerHTML="<p>Trial "+(trialindex+1)+" of "+maxtrials; //after trialindex++ so as if 1 indexed.
+	}
 	trialindex++;
-	document.getElementById("expfooter").innerHTML="<p>Trial "+trialindex+" of "+maxtrials; //after trialindex++ so as if 1 indexed.
     }else{
 	$.post("/finish",function(data){window.location.replace(data)});
     }
@@ -91,31 +85,90 @@ function linelength(x1,y1,x2,y2){
 }
 
 var drawtime = "init";
+
+function pairrecordResponse(positionchosen,stimsummary,stimid){
+    var mystim=JSON.parse(stimsummary);
+
+    var saveMe = {
+	EW1:mystim.EastWest1,
+	EW2:mystim.EastWest2,
+	NS1:mystim.NorthSouth1,
+	NS2:mystim.NorthSouth2,
+	area1:mystim.area1,
+	area2:mystim.area2,
+	presentationposition1:mystim.presentation1,
+	presentationposition2:mystim.presentation2,
+	templatetype1:mystim.templatetype1,
+	templatetype2:mystim.templatetype2,
+
+	positionchosen:positionchosen,
+	areachosen: (mystim.presentation_position[positionchosen]==0) ? mystim.area1 : mystim.area2,
+	templatechosen:mystim.roles[mystim.presentation_position[positionchosen]],
+	drawtime:drawtime,
+	responsetime:Date.now(),
+	inspectiontime:Date.now()-drawtime,
+	ppntid:localStorage.getItem("ppntID"),
+	stimid:mystim.stimid
+    }
+    console.log(saveMe);
+    nextTrial(); // Put the pairs save method on server. Put a pairs download button on dashboard. Uncomment here, run yourself through, write analysis script. Life's good?
+
+//save to db
+    	$.post("/pairresponse",{myresponse:JSON.stringify(saveMe)},
+	       function(success){
+		   console.log(success);//probably 'success', might be an error
+		   //Note potential error not handled at all. Hah.
+	       }
+	      );
+}
 function recordResponse(positionchosen,stimsummary,stimid){
     var mytrial = allmanagers[0].getcurrent();
     var rolechosen = mytrial.roles[mytrial.presentation_position[positionchosen]]; //means "get the role corresponding to the thing presented at the position clicked."
-    console.log(positionchosen);
-    console.log(rolechosen);
-    console.log(mytrial.presentation_position);
-    
-    // stimsummary = JSON.parse(stimsummary); //from JSON string back into an object. Because trying to return 'this' from the trialobj summary fn was terrifying, easier/safer to pass a string and reconstitute it here, add whatever response-recording attributes you want and then pass to db as an object.
+    //if ppnt chose the target, that's attraction-effectish, move the decoy closer to the target.
+    //if ppnt chose the comp, that's similarity-effectish, move the decoy away from the target.
+    allmanagers[0].update(rolechosen);
 
-    // stimsummary.ppntID = localStorage.getItem("ppntID");//a random number generated (on page load) in admin.js. How reliable is this? Will some people turn off localstorage?
-    // stimsummary.positionchosen = positionchosen;
-    // stimsummary.rolechosen = stimsummary.roles[stimsummary.presentation_position[positionchosen]];
-    // stimsummary.drawtime = drawtime; //public var set by triangle.drawme
-    // stimsummary.responsetime = Date.now(); //will probably match the time recorded in response db table.
-    // stimsummary.presentationsequence = trialindex;
-    
-//    nextTrial(); //call by hand when you're done inspecting them results in the console.
+    var mystim =  JSON.parse(stimsummary); //If you'd done this right the first time, stimsummary would be exactly the thing you want to save :-( close but no cigar.
+    //make a data-save object:
+
+    var saveMe = {
+	template1:mystim.templatetype1,
+	template2:mystim.templatetype2,
+	template3:mystim.templatetype3,
+	NS1:mystim.NorthSouth1,
+	NS2:mystim.NorthSouth2,
+	NS3:mystim.NorthSouth3,
+	EW1:mystim.EastWest1,
+	EW2:mystim.EastWest2,
+	EW3:mystim.EastWest3,
+	area1:mystim.area1,
+	area2:mystim.area2,
+	area3:mystim.area3,
+	role1:mystim.roles[0],
+	role2:mystim.roles[1],
+	role3:mystim.roles[2],
+	position1:mystim.presentation1,
+	position2:mystim.presentation2,
+	position3:mystim.presentation3,
+	decoydistance:mystim.decoydist,
+	optionchosen:rolechosen,
+	ppntid:localStorage.getItem("ppntID"),
+	drawtime:drawtime,
+	responsetime:Date.now(),
+	inspectiontime:Date.now()-drawtime,
+	stimid:mystim.stimid,
+	shapeflavor:allmanagers[0].flavor.join("")
+     }
+//    console.log(saveMe); 
+    nextTrial();
 
 //save to db
-    	// $.post("/response",{myresponse:JSON.stringify(stimsummary)},
-	//        function(success){
-	// 	   console.log(success);//probably 'success', might be an error
-	// 	   //Note potential error not handled at all. Hah.
-	//        }
-	//       );
+    	$.post("/response",{myresponse:JSON.stringify(saveMe)},
+	       function(success){
+		   console.log(success);//probably 'success', might be an error
+		   //Note potential error not handled at all. Hah.
+	       }
+	      );
 }
 
 //stim template. Can rotate, stretch height or width, & dilate
@@ -246,10 +299,10 @@ function pairtrialobj(triangles,stimid){
     this.drawme = function(targdiv){
 	drawtime=Date.now();
 	document.getElementById(targdiv).innerHTML = "<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
-	"<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td>"+
+	"<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=pairrecordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td>"+
 	    "<td><canvas id='stimleft' width='"+canvassize/2+"' height='"+canvassize/2+"'></canvas></td>"+
 	    "<td><canvas id='stimright' width='"+canvassize/2+"' height='"+canvassize/2+"'></canvas></td>"+
-	    "<td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
+	    "<td align='right' class='buttontd'><button class='responsebutton' onclick=pairrecordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
 
 	var leftcanvas = document.getElementById('stimleft');
 	var rightcanvas = document.getElementById('stimright');
@@ -448,18 +501,18 @@ function pairtrialgetter(x1,y1,x2,y2,template1,template2,stimid){
 //MAIN: exp stim setup starts here.
 
 //DIADS
-// var trials = [];
-// //add diad stim (to check template impact)
-// var templatelist = ["rightangle","equilateral","skew"];
-// var sizediffs = [.9,1,1.1]; //one option size 1, other option this size. 1-1 comparison is important!
-// for(var i=0;i<templatelist.length;i++){
-//     for(var j=0;j<templatelist.length;j++){
-// 	for(var whichsize=0;whichsize<sizediffs.length;whichsize++){
-// 	    if(i==j&&sizediffs[whichsize]==1)continue;//same template diff sizes gives (some) accuracy info, but same template same size is boring.
-// 	    trials.push(pairtrialgetter(1,1,sizediffs[whichsize],sizediffs[whichsize],templatelist[i],templatelist[j],"pair"+templatelist[i]+"vs"+templatelist[j]+"_"+sizediffs[whichsize]));
-// 	}
-//     }
-// }
+var trials = [];
+//add diad stim (to check template impact)
+var templatelist = ["rightangle","equilateral","skew"];
+var sizediffs = [.9,1,1.1]; //one option size 1, other option this size. 1-1 comparison is important!
+for(var i=0;i<templatelist.length;i++){
+    for(var j=0;j<templatelist.length;j++){
+	for(var whichsize=0;whichsize<sizediffs.length;whichsize++){
+	    if(i==j&&sizediffs[whichsize]==1)continue;//same template diff sizes gives (some) accuracy info, but same template same size is boring.
+	    trials.push(pairtrialgetter(1,1,sizediffs[whichsize],sizediffs[whichsize],templatelist[i],templatelist[j],"pair"+templatelist[i]+"vs"+templatelist[j]+"_"+sizediffs[whichsize]));
+	}
+    }
+}
 //END DIADS
 
 //Triads:
@@ -468,20 +521,32 @@ function pairtrialgetter(x1,y1,x2,y2,template1,template2,stimid){
 
 //possible flavors are:
 
-var get_trialmanager = function(myflavor){
+var get_trialmanager = function(myflavor,initdist){
     this.id = "tm"+myflavor.join("");
     this.flavor = myflavor;
-    this.decoydistance = .4;
-    this.direction = -1;
+    this.decoydistance = initdist;
     this.history = [];
-    this.stepsize = .1;
+    this.stepsize = .05;
     this.getcurrent = function(){
 	return this.history[this.history.length-1];
     }
     this.nextTrial = function(){
-	var newtrial = trialgetter(1,.5,1,.5,Math.sqrt(this.decoydistance)*1,Math.sqrt(this.decoydistance)*.5,myflavor,['targ','comp','decoy'],['0','1','0'],this.id+"_"+history.length,this.decoydistance);
+	var newtrial = trialgetter(1,.5,1,.5,Math.sqrt(this.decoydistance)*1,Math.sqrt(this.decoydistance)*.5,myflavor,['targ','comp','decoy'],['0','1','0'],this.id+"_"+this.history.length,this.decoydistance);
 	this.history.push(newtrial);
 	return newtrial;
+    }
+
+    this.update = function(rolechosen){
+	//crudest staircase you will ever see, should do a little more due diligence on this, might be a little too crude.
+	if(rolechosen=="targ"){
+	    this.decoydistance = Math.min(this.decoydistance+this.stepsize,1); //decoy closer -> more likely to give similarity, promoting comp
+	}
+	if(rolechosen=="comp"){
+	    this.decoydistance = Math.max(this.decoydistance-this.stepsize, .4); //decoy more distant -> more likely to give attraction, promoting targ.
+	}
+	if(rolechosen=="decoy"){
+	    this.decoydistance-=this.stepsize; //stop choosing the decoy you chump.
+	}
     }
     // this.trialhistory = [];
     // this.distancehistory = [];
@@ -497,12 +562,13 @@ var flavors = [
     [0,1,2]
 ]
 for(var i=0;i<flavors.length;i++){
-    allmanagers.push(new get_trialmanager(flavors[i]))
+    allmanagers.push(new get_trialmanager(flavors[i],.4))
+    allmanagers.push(new get_trialmanager(flavors[i],.9))
 }
 
 //Go!
 // var trials = []
 // for(var i=0;i<triads.length;i++)trials.push(triads[i])
-// shuffle(trials);
+shuffle(trials);
 
 nextTrial();
