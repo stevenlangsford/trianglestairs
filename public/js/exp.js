@@ -526,7 +526,7 @@ var get_trialmanager = function(myflavor,initdist){
     this.flavor = myflavor;
     this.decoydistance = initdist;
     this.history = [];
-    this.stepsize = .05;
+    this.stepsize = .1;
     this.getcurrent = function(){
 	return this.history[this.history.length-1];
     }
