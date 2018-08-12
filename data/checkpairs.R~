@@ -1,0 +1,4 @@
+source("readin_data.R")
+
+pairs.df$area_diff <- pairs.df$area1-pairs.df$area2
+positionchosen~
