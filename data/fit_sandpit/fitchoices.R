@@ -16,7 +16,7 @@ ordobs.df = data.frame(trialid=c(),option1=c(),option2=c(),attribute=c(),value=c
 
 ## stim
 
-responses.df <- read.csv("../raw_data/responsedata.csv")
+responses.df <- read.csv("../raw_data/responsedata.csv",colClasses=c("shapeflavor"="factor"))
 responses.df$trialid = 1:nrow(responses.df) #More than one 'obs' can be associated with each trial.
 ##convert NS, EW attributes & areas to a stan-friendly scale by dividing everywhere by a constant px-to-stanunits conversion factor
 ##Scale areas as a proportion of max area, largest area is 1. 1/2w*h<=1 doesn't actually constrain w and h, but here they're in 0-2.
