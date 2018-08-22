@@ -3,25 +3,32 @@
 // //then put a list of trial-property-setter entries in 'stim' and you're golden.
 
 // var trials = [];
-var trialindex = 0;
-var diadindex = 0;
-var maxtrials = 100;//70?
+//var trialindex = 0;
+//var diadindex = 0;
+//var maxtrials = 100;//70?
 
-
+var currentTrial = null; //Ouch. I swear in the original version there was none of this global var bs. Not that including it on mutation is any better. :-(
 function nextTrial(){
-    if(trialindex<maxtrials){
-	if(Math.random()<.2&&diadindex<trials.length){//about 1 in 5 or until they run out.
-	    trials[diadindex].drawme("uberdiv");
-	    diadindex++;
-	}else{
-	shuffle(allmanagers);
-	allmanagers[0].nextTrial().drawme("uberdiv");
-	    document.getElementById("expfooter").innerHTML="<p>Trial "+(trialindex+1)+" of "+maxtrials; //after trialindex++ so as if 1 indexed.
-	}
-	trialindex++;
+    if(blockindex<all_questionblocks.length){
+	currentTrial = all_questionblocks[blockindex].currentTrial(); //read by keyboardListener, which waits for responses. Switched away from clickable buttons because response times requested. Note order is important, you need to pull currentTrial and then call runTrial: runTrial draws the question block's currenttrial then increments it.
+	all_questionblocks[blockindex].runTrial();
+
     }else{
 	$.post("/finish",function(data){window.location.replace(data)});
     }
+    // if(trialindex<maxtrials){
+    // 	if(Math.random()<.2&&diadindex<trials.length){//about 1 in 5 or until they run out.
+    // 	    trials[diadindex].drawme("uberdiv");
+    // 	    diadindex++;
+    // 	}else{
+    // 	shuffle(allmanagers);
+    // 	allmanagers[0].nextTrial().drawme("uberdiv");
+    // 	    document.getElementById("expfooter").innerHTML="<p>Trial "+(trialindex+1)+" of "+maxtrials; //after trialindex++ so as if 1 indexed.
+    // 	}
+    // 	trialindex++;
+    // }else{
+    // 	$.post("/finish",function(data){window.location.replace(data)});
+    // }
 }
 
 // // a trial object should have a drawMe function and a bunch of attributes.
@@ -86,8 +93,27 @@ function linelength(x1,y1,x2,y2){
 
 var drawtime = "init";
 
-function pairrecordResponse(positionchosen,stimsummary,stimid){
-    var mystim=JSON.parse(stimsummary);
+var keyslive = false; //set to true by triangle draw function: whenever a triangle is drawn, you can react to it. Gods, the spagettification of this code...
+function keyboardListener(event) {
+     if(!keyslive)return; 
+    // keyslive = false; //temp deafness on each keypress would avoid blitzing, but we want reaction times?
+    // setTimeout(function(){keyslive=true},1000);
+
+    
+    var x = event.key;
+//    console.log(currentTrial);
+    if(x=='a'||x=='l'||x=='A'||x=='L'||x==" "){
+	keyslive=false; //will turn off responses until the next triangle is drawn: if a triangle is drawn you're in a trial, if not an outro or block-sep screen.
+	pairrecordResponse(x);
+    }else{
+	console.log("Not a response key:"+x);// todo: consider counting the number of bad keypresses? Might be a sensible exclusion criterion? Maybe watch silently this time just to see what the pattern is, or if there even is one.
+    }
+}
+document.addEventListener('keydown', keyboardListener)
+
+
+function pairrecordResponse(mykey){//used to pass args, now everything scraped from global var currentStim. Sadface, this smells.
+    var mystim=JSON.parse(currentTrial.summaryobj()) //WTF is this bouncing in and out of JSON format? I think there used to be a reason, probably intended to save summaryobj directly to db. Sigh.
 
     var saveMe = {
 	EW1:mystim.EastWest1,
@@ -101,26 +127,50 @@ function pairrecordResponse(positionchosen,stimsummary,stimid){
 	templatetype1:mystim.templatetype1,
 	templatetype2:mystim.templatetype2,
 
-	positionchosen:positionchosen,
-	areachosen: (mystim.presentation_position[positionchosen]==0) ? mystim.area1 : mystim.area2,
-	templatechosen:mystim.roles[mystim.presentation_position[positionchosen]],
+	responsekey:mykey,
+//	areachosen: (mystim.presentation_position[positionchosen]==0) ? mystim.area1 : mystim.area2,
+//	templatechosen:mystim.roles[mystim.presentation_position[positionchosen]],
 	drawtime:drawtime,
 	responsetime:Date.now(),
 	inspectiontime:Date.now()-drawtime,
 	ppntid:localStorage.getItem("ppntID"),
 	stimid:mystim.stimid
     }
-    console.log(saveMe);
-    nextTrial(); // Put the pairs save method on server. Put a pairs download button on dashboard. Uncomment here, run yourself through, write analysis script. Life's good?
 
-//save to db
+    //So the deal is: the stim object has a fixed triangle1, triangle2, always in that order, and randomizes left and right when drawing to the screen based on 'presentation position'. Response keys indicate left or right: you need to map this back to which triangle was chosen by checking which triangles were where. Could do this in a data preprocessing step, so long as you remember, but probably best to keep this as close to the drawing code as possible? Anyway this whole process is not very ergonomic, there's probably a better way!
+    var positionchosen = mykey=='a'||mykey=='A' ? mystim.presentation1 : mykey=='l'||mykey=='L' ? mystim.presentation2 : 'equal'; //Filtering to only legal responses done in keyboardlistener.
+    if(positionchosen!='equal'){
+	positionchosen=positionchosen+1; //convert 0,1 to 1,2
+	saveMe.areachosen = saveMe["area"+positionchosen]
+	saveMe.arearejected = saveMe["area"+(positionchosen%2+1)]
+	saveMe.templatechosen = saveMe["templatetype"+positionchosen]
+	saveMe.templaterejected = saveMe["templatetype"+(positionchosen%2+1)]
+	saveMe.NSchosen = saveMe["NS"+positionchosen]
+	saveMe.EWchosen = saveMe["EW"+positionchosen]
+	saveMe.NSrejected = saveMe["NS"+(positionchosen%2+1)]
+	saveMe.EWrejected = saveMe["EW"+(positionchosen%2+1)]
+    }else{ //gotta have consistent fillers for the data download & transfer to R. objs saved to the same db must have the same fields.
+	saveMe.areachosen = "equal"
+	saveMe.arearejected = "equal"
+	saveMe.templatechosen = "equal"
+	saveMe.templaterejected = "equal"
+	saveMe.NSchosen = "equal"
+	saveMe.EWchosen = "equal"
+	saveMe.NSrejected = "equal"
+	saveMe.EWrejected = "equal"
+    }
+    
+    console.log(saveMe);
+    nextTrial();
+
+// //save to db
     	$.post("/pairresponse",{myresponse:JSON.stringify(saveMe)},
 	       function(success){
 		   console.log(success);//probably 'success', might be an error
 		   //Note potential error not handled at all. Hah.
 	       }
 	      );
-}
+}//end pair record response
 function recordResponse(positionchosen,stimsummary,stimid){
     var mytrial = allmanagers[0].getcurrent();
     var rolechosen = mytrial.roles[mytrial.presentation_position[positionchosen]]; //means "get the role corresponding to the thing presented at the position clicked."
@@ -263,7 +313,8 @@ function triangle(base,height,templatetype, orientation){
 	return	Math.max(this.y1,this.y2,this.y3);
     }
 
-    this.drawme = function(canvas,shiftx,shifty,color){	
+    this.drawme = function(canvas,shiftx,shifty,color){
+	keyslive = true; //horrible global var use :-(
 	var leftmost = Math.min(this.x1,this.x2,this.x3);
 	var highest = Math.min(this.y1,this.y2,this.y3);
 	var rightmost = Math.max(this.x1,this.x2,this.x3);
@@ -298,11 +349,19 @@ function pairtrialobj(triangles,stimid){
 
     this.drawme = function(targdiv){
 	drawtime=Date.now();
-	document.getElementById(targdiv).innerHTML = "<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
-	"<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=pairrecordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td>"+
-	    "<td><canvas id='stimleft' width='"+canvassize/2+"' height='"+canvassize/2+"'></canvas></td>"+
-	    "<td><canvas id='stimright' width='"+canvassize/2+"' height='"+canvassize/2+"'></canvas></td>"+
-	    "<td align='right' class='buttontd'><button class='responsebutton' onclick=pairrecordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
+	document.getElementById(targdiv).innerHTML = "<div><table style='border:solid 3px black; margin:0 auto'>"+//haha, tables. Oh dear.
+	"<tr><td align='left' class='buttontd'>"+
+	    "<span class='kbdprompt'>This one [A]</span>"+
+//	    "A"+//"<button class='responsebutton' onclick=pairrecordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button>
+	    "</td>"+
+	    "<td><canvas id='stimleft' width='"+canvassize/1.5+"' height='"+canvassize/1.5+"'></canvas></td>"+
+	    "<td><canvas id='stimright' width='"+canvassize/1.5+"' height='"+canvassize/1.5+"'></canvas></td>"+
+	    "<td align='right' class='buttontd'>"+
+	    "<span class='kbdprompt'>[L] This one</span>"+
+//	    "L"+//	    "<button class='responsebutton' onclick=pairrecordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button>"+
+	    "</td></tr>"+
+	    "<tr><td colspan='5' border='1px solid yellow' align='center'>[space] <br/> They're equal</td></tr>"+
+	    "</table></div>";
 
 	var leftcanvas = document.getElementById('stimleft');
 	var rightcanvas = document.getElementById('stimright');
@@ -501,74 +560,116 @@ function pairtrialgetter(x1,y1,x2,y2,template1,template2,stimid){
 //MAIN: exp stim setup starts here.
 
 //DIADS
-var trials = [];
-//add diad stim (to check template impact)
+
+
+var questionblockobj = function(myquestion){
+    this.trials = [];
+    this.trialindex = -1;
+    //add diad stim (to check template impact)
+    this.qtitle = myquestion;
+
 var templatelist = ["rightangle","equilateral","skew"];
-var sizediffs = [.9,1,1.1]; //one option size 1, other option this size. 1-1 comparison is important!
-for(var i=0;i<templatelist.length;i++){
-    for(var j=0;j<templatelist.length;j++){
-	for(var whichsize=0;whichsize<sizediffs.length;whichsize++){
-	    if(i==j&&sizediffs[whichsize]==1)continue;//same template diff sizes gives (some) accuracy info, but same template same size is boring.
-	    trials.push(pairtrialgetter(1,1,sizediffs[whichsize],sizediffs[whichsize],templatelist[i],templatelist[j],"pair"+templatelist[i]+"vs"+templatelist[j]+"_"+sizediffs[whichsize]));
+    var heights = [.5,1.3]//[.9,1,1.1]; //one option size 1, other option this size. 1-1 comparison is important!
+    var widths = [.5,1.3]//[.9,1,1.1];
+    
+    for(var i=0;i<templatelist.length;i++){
+	for(var j=0;j<templatelist.length;j++){
+	    for(var height1=0;height1<heights.length;height1++){
+		for(var width1=0;width1<widths.length;width1++){
+		    //pairtrialgetter args are: x1,y1,x2,y2,template1,template2,stimid
+		    this.trials.push(pairtrialgetter(1,1,
+	    					     widths[width1],heights[height1],
+	    					     templatelist[i],
+	    					     templatelist[j],
+	    					     "pair"+templatelist[i]+"vs"+templatelist[j]+"_"+(widths[width1]*heights[height1]/2.0))
+	    			    );
+		}//width1
+	    }//height1
+	}//template j
+    }//template i
+    shuffle(this.trials);
+    
+    this.currentTrial = function(){
+	return this.trials[this.trialindex];
+    }
+    
+    this.runTrial = function(){
+	if(this.trialindex==-1){ //on first run, draw spacer screen
+	    	    document.getElementById("pgtitle").innerHTML="";
+	    document.getElementById("uberdiv").innerHTML="<h1>The question in this block is</h1><h2>"+myquestion+"</h2>"+
+		"<button onclick='nextTrial()'>Begin</button>";
+	    this.trialindex++;
+	}
+	else if(this.trialindex<this.trials.length){
+	    document.getElementById("pgtitle").innerHTML="<h1>"+this.qtitle+"</h1>";
+	    document.getElementById("expfooter").innerHTML="<p> "+(Math.floor(this.trialindex/this.trials.length*100))+"% of block "+(blockindex+1)+", "+(all_questionblocks.length-blockindex+" remaining"); //ugh, global vars. Ew.
+	    this.trials[this.trialindex].drawme("uberdiv");
+	    this.trialindex++;
+	}else{
+	    blockindex++ ;//ugh, global vars, yuk.
+	    nextTrial();
 	}
     }
-}
+}// questionblockobj
 //END DIADS
 
-//Triads:
+//Start Triads:
+// //possible flavors are:
+// var get_trialmanager = function(myflavor,initdist){
+//     this.id = "tm"+myflavor.join("");
+//     this.flavor = myflavor;
+//     this.decoydistance = initdist;
+//     this.history = [];
+//     this.stepsize = .1;
+//     this.getcurrent = function(){
+// 	return this.history[this.history.length-1];
+//     }
+//     this.nextTrial = function(){
+// 	var newtrial = trialgetter(1,.5,1,.5,Math.sqrt(this.decoydistance)*1,Math.sqrt(this.decoydistance)*.5,myflavor,['targ','comp','decoy'],['0','1','0'],this.id+"_"+this.history.length,this.decoydistance);
+// 	this.history.push(newtrial);
+// 	return newtrial;
+//     }
 
-//trialgetter args are: trialgetter(x1,y1,x2,y2,x3,y3,shapetypes,roles,orientations,stimid,decoydist)
+//     this.update = function(rolechosen){
+// 	//crudest staircase you will ever see, should do a little more due diligence on this, might be a little too crude.
+// 	if(rolechosen=="targ"){
+// 	    this.decoydistance = Math.min(this.decoydistance+this.stepsize,1); //decoy closer -> more likely to give similarity, promoting comp
+// 	}
+// 	if(rolechosen=="comp"){
+// 	    this.decoydistance = Math.max(this.decoydistance-this.stepsize, .4); //decoy more distant -> more likely to give attraction, promoting targ.
+// 	}
+// 	if(rolechosen=="decoy"){
+// 	    this.decoydistance-=this.stepsize; //stop choosing the decoy you chump.
+// 	}
+//     }
+//     // this.trialhistory = [];
+//     // this.distancehistory = [];
+//     // this.choicehistory = []; //?    
+// }
 
-//possible flavors are:
-
-var get_trialmanager = function(myflavor,initdist){
-    this.id = "tm"+myflavor.join("");
-    this.flavor = myflavor;
-    this.decoydistance = initdist;
-    this.history = [];
-    this.stepsize = .1;
-    this.getcurrent = function(){
-	return this.history[this.history.length-1];
-    }
-    this.nextTrial = function(){
-	var newtrial = trialgetter(1,.5,1,.5,Math.sqrt(this.decoydistance)*1,Math.sqrt(this.decoydistance)*.5,myflavor,['targ','comp','decoy'],['0','1','0'],this.id+"_"+this.history.length,this.decoydistance);
-	this.history.push(newtrial);
-	return newtrial;
-    }
-
-    this.update = function(rolechosen){
-	//crudest staircase you will ever see, should do a little more due diligence on this, might be a little too crude.
-	if(rolechosen=="targ"){
-	    this.decoydistance = Math.min(this.decoydistance+this.stepsize,1); //decoy closer -> more likely to give similarity, promoting comp
-	}
-	if(rolechosen=="comp"){
-	    this.decoydistance = Math.max(this.decoydistance-this.stepsize, .4); //decoy more distant -> more likely to give attraction, promoting targ.
-	}
-	if(rolechosen=="decoy"){
-	    this.decoydistance-=this.stepsize; //stop choosing the decoy you chump.
-	}
-    }
-    // this.trialhistory = [];
-    // this.distancehistory = [];
-    // this.choicehistory = []; //?    
-}
-
-var allmanagers = [];
-var flavors = [
-    [0,0,0],
-    [0,0,1],
-    [0,1,0],
-    [1,0,0],
-    [0,1,2]
-]
-for(var i=0;i<flavors.length;i++){
-    allmanagers.push(new get_trialmanager(flavors[i],.4))
-    allmanagers.push(new get_trialmanager(flavors[i],.9))
-}
+// var allmanagers = [];
+// var flavors = [
+//     [0,0,0],
+//     [0,0,1],
+//     [0,1,0],
+//     [1,0,0],
+//     [0,1,2]
+// ]
+// for(var i=0;i<flavors.length;i++){
+//     allmanagers.push(new get_trialmanager(flavors[i],.4))
+//     allmanagers.push(new get_trialmanager(flavors[i],.9))
+// }
 
 //Go!
-// var trials = []
-// for(var i=0;i<triads.length;i++)trials.push(triads[i])
-shuffle(trials);
+//shuffle(trials);
+//nextTrial();
+//End triads
 
+var blockindex = 0;
+var all_questionblocks = shuffle([new questionblockobj("Which triangle is taller?"),
+				  new questionblockobj("Which triangle is wider?"),
+				  new questionblockobj("Which triangle has the largest area?"),
+				  new questionblockobj("Do these two triangles match?"),
+				 ]);
 nextTrial();
+
