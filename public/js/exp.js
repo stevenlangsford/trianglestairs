@@ -8,9 +8,11 @@
 //var maxtrials = 100;//70?
 
 var currentTrial = null; //Ouch. I swear in the original version there was none of this global var bs. Not that including it on mutation is any better. :-(
+var currentquestion = null;
 function nextTrial(){
     if(blockindex<all_questionblocks.length){
 	currentTrial = all_questionblocks[blockindex].currentTrial(); //read by keyboardListener, which waits for responses. Switched away from clickable buttons because response times requested. Note order is important, you need to pull currentTrial and then call runTrial: runTrial draws the question block's currenttrial then increments it.
+	currentquestion = all_questionblocks[blockindex].qtitle; // For some unholy reason this is read by keyboardresponselistener to tell if it's recording a response to a comparison trial (the default) or a 'match' trial. The shittyness of this code is getting out of control, even by my standards.
 	all_questionblocks[blockindex].runTrial();
 
     }else{
@@ -94,23 +96,64 @@ function linelength(x1,y1,x2,y2){
 var drawtime = "init";
 
 var keyslive = false; //set to true by triangle draw function: whenever a triangle is drawn, you can react to it. Gods, the spagettification of this code...
-function keyboardListener(event) {
+function keyboardListener(event) {//all this does is: filter to legal response keys for the current question, and dispatch legal responses to the appropriate question-specific response handler.
+    var x = event.key;
      if(!keyslive)return; 
     // keyslive = false; //temp deafness on each keypress would avoid blitzing, but we want reaction times?
     // setTimeout(function(){keyslive=true},1000);
 
-    
-    var x = event.key;
-//    console.log(currentTrial);
+    if(currentquestion=="Do these two triangles match?"){
+	if(x=='a'||x=='l'||x=='A'||x=='L'){//legal response keys: space is no longer one of them
+	    matchrecordResponse(x);
+	}else{
+	    console.log("not a response key: "+x);
+	}
+    }else{//begin default behavior, when currentquestion is not 'do these triangles match'
     if(x=='a'||x=='l'||x=='A'||x=='L'||x==" "){
 	keyslive=false; //will turn off responses until the next triangle is drawn: if a triangle is drawn you're in a trial, if not an outro or block-sep screen.
 	pairrecordResponse(x);
     }else{
 	console.log("Not a response key:"+x);// todo: consider counting the number of bad keypresses? Might be a sensible exclusion criterion? Maybe watch silently this time just to see what the pattern is, or if there even is one.
     }
+    }//ends 'default' comparison response behavior.
 }
 document.addEventListener('keydown', keyboardListener)
 
+function matchrecordResponse(mykey){
+    var mystim=JSON.parse(currentTrial.summaryobj()) //Sigh.
+    var saveMe = {
+	EW1:mystim.EastWest1,
+	EW2:mystim.EastWest2,
+	NS1:mystim.NorthSouth1,
+	NS2:mystim.NorthSouth2,
+	orientation1:currentTrial.triangles[0].orientation,
+	orientation2:currentTrial.triangles[1].orientation,
+	area1:mystim.area1,
+	area2:mystim.area2,
+	presentationposition1:mystim.presentation1,
+	presentationposition2:mystim.presentation2,
+	templatetype1:mystim.templatetype1,
+	templatetype2:mystim.templatetype2,
+	responsekey:mykey,
+	responsemeans: mykey=='a'||mykey=='A' ? "match" : "notmatch", //filtering to only 'a' or 'l' done by keyboardlistener.
+	drawtime:drawtime,
+	responsetime:Date.now(),
+	inspectiontime:Date.now()-drawtime,
+	ppntid:localStorage.getItem("ppntID"),
+	stimid:mystim.stimid
+    }
+
+    console.log(saveMe);
+    nextTrial();
+
+    $.post("/matchresponse",{myresponse:JSON.stringify(saveMe)},
+	   function(success){
+	       console.log(success);//probably 'success', might be an error
+	       //Note potential error not handled at all. Hah.
+	   }
+	  );
+    
+}
 
 function pairrecordResponse(mykey){//used to pass args, now everything scraped from global var currentStim. Sadface, this smells.
     var mystim=JSON.parse(currentTrial.summaryobj()) //WTF is this bouncing in and out of JSON format? I think there used to be a reason, probably intended to save summaryobj directly to db. Sigh.
@@ -120,6 +163,8 @@ function pairrecordResponse(mykey){//used to pass args, now everything scraped f
 	EW2:mystim.EastWest2,
 	NS1:mystim.NorthSouth1,
 	NS2:mystim.NorthSouth2,
+	orientation1:currentTrial.triangles[0].orientation,
+	orientation2:currentTrial.triangles[1].orientation,
 	area1:mystim.area1,
 	area2:mystim.area2,
 	presentationposition1:mystim.presentation1,
@@ -337,7 +382,33 @@ function triangle(base,height,templatetype, orientation){
     }
 }//end triangle
 
-function pairtrialobj(triangles,stimid){
+
+var comparisonpairdrawHTML = "<div><table style='border:solid 3px black; margin:0 auto'>"+//haha, tables. Oh dear.
+"<tr><td align='left' class='buttontd'>"+
+    "<span class='kbdprompt' id='aside'>This one [A]</span>"+
+    "</td>"+
+    "<td><canvas id='stimleft' width='"+canvassize/1.5+"' height='"+canvassize/1.5+"'></canvas></td>"+
+    "<td><canvas id='stimright' width='"+canvassize/1.5+"' height='"+canvassize/1.5+"'></canvas></td>"+
+    "<td align='right' class='buttontd'>"+
+    "<span class='kbdprompt' id='lside'>[L] This one</span>"+
+    "</td></tr>"+
+    "<tr><td colspan='5'>[space] <br/> They're equal</td></tr>"+
+    "</table></div>";
+
+var matchpairdrawHTML = "<div><table style='border:solid 3px black; margin:0 auto'>"+//haha, tables. Oh dear.
+"<tr><td align='left' class='buttontd'>"+
+    "<span class='kbdprompt' id='aside'></span>"+
+    "</td>"+
+    "<td><canvas id='stimleft' width='"+canvassize/1.5+"' height='"+canvassize/1.5+"'></canvas></td>"+
+    "<td><canvas id='stimright' width='"+canvassize/1.5+"' height='"+canvassize/1.5+"'></canvas></td>"+
+    "<td align='right' class='buttontd'>"+
+    "<span class='kbdprompt' id='lside'></span>"+
+    "</td></tr>"+
+    "<tr><td colspan='5'>[A]= match <br/> doesn't match = [L]</td></tr>"+
+    "</table></div>";
+
+
+function pairtrialobj(triangles,stimid,drawerHTML){
     this.triangles = triangles;
     this.presentation_position = shuffle([0,1])
     this.hm_rotations=shuffle([0,1,2,3])[0];
@@ -347,21 +418,16 @@ function pairtrialobj(triangles,stimid){
     	for(var j=0;j<this.triangles.length;j++)this.triangles[j]=this.triangles[j].cloneme().rotate90();//whee
     }
 
-    this.drawme = function(targdiv){
+    this.drawme = function(targdiv){ //draw happens in two steps: clear the screen, then draw the trial. Avoids blitzing under the new kbd setup aimed at getting RT.
+	document.getElementById(targdiv).innerHTML="+";
+	console.log("pt");
+	setTimeout(this.oknowactuallydrawme.bind(this,targdiv),1000); //Wow, that's some nasty js scoping horror. check browser consistancy?
+    }
+    
+    this.oknowactuallydrawme = function(targdiv){
+	console.log("sweet");
 	drawtime=Date.now();
-	document.getElementById(targdiv).innerHTML = "<div><table style='border:solid 3px black; margin:0 auto'>"+//haha, tables. Oh dear.
-	"<tr><td align='left' class='buttontd'>"+
-	    "<span class='kbdprompt'>This one [A]</span>"+
-//	    "A"+//"<button class='responsebutton' onclick=pairrecordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button>
-	    "</td>"+
-	    "<td><canvas id='stimleft' width='"+canvassize/1.5+"' height='"+canvassize/1.5+"'></canvas></td>"+
-	    "<td><canvas id='stimright' width='"+canvassize/1.5+"' height='"+canvassize/1.5+"'></canvas></td>"+
-	    "<td align='right' class='buttontd'>"+
-	    "<span class='kbdprompt'>[L] This one</span>"+
-//	    "L"+//	    "<button class='responsebutton' onclick=pairrecordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button>"+
-	    "</td></tr>"+
-	    "<tr><td colspan='5' border='1px solid yellow' align='center'>[space] <br/> They're equal</td></tr>"+
-	    "</table></div>";
+	document.getElementById(targdiv).innerHTML = drawerHTML;
 
 	var leftcanvas = document.getElementById('stimleft');
 	var rightcanvas = document.getElementById('stimright');
@@ -375,10 +441,10 @@ function pairtrialobj(triangles,stimid){
 							     rightcanvas.height/2-this.triangles[this.presentation_position[1]].lowest()/2+Math.random()*jitter-jitter/2,
 							     "black");
 	
-	setTimeout(function(){
-	    var responsebuttons = document.getElementsByClassName("responsebutton");
-	    for(var i=0;i<responsebuttons.length;i++)responsebuttons[i].disabled=false;
-	},1000)
+	// setTimeout(function(){
+	//     var responsebuttons = document.getElementsByClassName("responsebutton");
+	//     for(var i=0;i<responsebuttons.length;i++)responsebuttons[i].disabled=false;
+	// },1000)
     }
 
     this.summaryobj = function(){
@@ -545,7 +611,7 @@ function trialgetter(x1,y1,x2,y2,x3,y3,shapetypes,roles,orientations,stimid,deco
 		       
 }
 
-function pairtrialgetter(x1,y1,x2,y2,template1,template2,stimid){
+function pairtrialgetter(x1,y1,x2,y2,template1,template2,stimid,drawHTML){
     var scalefactor = 100;//check consistency with triad trials (converts between 'scale relative to canonical size of 1' and 'canvas pixels')
     x1=x1*scalefactor;
     x2=x2*scalefactor;
@@ -553,40 +619,64 @@ function pairtrialgetter(x1,y1,x2,y2,template1,template2,stimid){
     y2=y2*scalefactor;
     var mytriangles = [new triangle(x1,y1,template1,shuffle([0,1,2,3])),
 		       new triangle(x2,y2,template2,shuffle([0,1,2,3]))]
-    return new pairtrialobj(mytriangles,stimid);
+    return new pairtrialobj(mytriangles,stimid,drawHTML);
 		       
 }
 
 //MAIN: exp stim setup starts here.
 
 //DIADS
-
-
 var questionblockobj = function(myquestion){
     this.trials = [];
     this.trialindex = -1;
     //add diad stim (to check template impact)
     this.qtitle = myquestion;
 
-var templatelist = ["rightangle","equilateral","skew"];
-    var heights = [.5,1.3]//[.9,1,1.1]; //one option size 1, other option this size. 1-1 comparison is important!
-    var widths = [.5,1.3]//[.9,1,1.1];
+    //STIMGEN VERSION TWO: Walk through templates, but have a fixed number of trials per combo, and make both triangles random between .8 and 1.2?
+    var attrmax = 1.2;
+    var attrmin = .8;
     
-    for(var i=0;i<templatelist.length;i++){
-	for(var j=0;j<templatelist.length;j++){
-	    for(var height1=0;height1<heights.length;height1++){
-		for(var width1=0;width1<widths.length;width1++){
-		    //pairtrialgetter args are: x1,y1,x2,y2,template1,template2,stimid
-		    this.trials.push(pairtrialgetter(1,1,
-	    					     widths[width1],heights[height1],
-	    					     templatelist[i],
-	    					     templatelist[j],
-	    					     "pair"+templatelist[i]+"vs"+templatelist[j]+"_"+(widths[width1]*heights[height1]/2.0))
-	    			    );
-		}//width1
-	    }//height1
-	}//template j
-    }//template i
+    var templatelist = ["rightangle","equilateral","skew"];
+    for(var reps=0;reps<10;reps++){
+	for(var i=0;i<templatelist.length;i++){
+	    for(var j=0;j<templatelist.length;j++){
+		this.trials.push(pairtrialgetter(Math.random()*(attrmax-attrmin)+attrmin,
+						 Math.random()*(attrmax-attrmin)+attrmin,
+						 Math.random()*(attrmax-attrmin)+attrmin,
+						 Math.random()*(attrmax-attrmin)+attrmin,
+	    					 templatelist[i],
+	    					 templatelist[j],
+	    					 "pair"+templatelist[i]+"vs"+templatelist[j]+"_"+reps,
+						 myquestion=="Do these two triangles match?" ? matchpairdrawHTML : comparisonpairdrawHTML
+						)
+	    			);
+		
+	    }
+	}
+    }
+    
+    //STIMGEN VERSION ONE: Walkthrough templates and one set of height/widths, other one fixed at 1:1 reference.
+// var templatelist = ["rightangle","equilateral","skew"];
+//     var heights = [.5,1.3]//[.9,1,1.1]; //one option size 1, other option this size. 1-1 comparison is important!
+//     var widths = [.5,1.3]//[.9,1,1.1];
+    
+//     for(var i=0;i<templatelist.length;i++){
+// 	for(var j=0;j<templatelist.length;j++){
+// 	    for(var height1=0;height1<heights.length;height1++){
+// 		for(var width1=0;width1<widths.length;width1++){
+// 		    //pairtrialgetter args are: x1,y1,x2,y2,template1,template2,stimid
+// 		    this.trials.push(pairtrialgetter(1,1,
+// 	    					     widths[width1],heights[height1],
+// 	    					     templatelist[i],
+// 	    					     templatelist[j],
+// 	    					     "pair"+templatelist[i]+"vs"+templatelist[j]+"_"+(widths[width1]*heights[height1]/2.0))
+// 	    			    );
+// 		}//width1
+// 	    }//height1
+// 	}//template j
+//     }//template i
+//END STIMGEN VERSION ONE
+    
     shuffle(this.trials);
     
     this.currentTrial = function(){
@@ -666,10 +756,10 @@ var templatelist = ["rightangle","equilateral","skew"];
 //End triads
 
 var blockindex = 0;
-var all_questionblocks = shuffle([new questionblockobj("Which triangle is taller?"),
-				  new questionblockobj("Which triangle is wider?"),
+var all_questionblocks = shuffle([//new questionblockobj("Which triangle is taller?"),
+				  //new questionblockobj("Which triangle is wider?"),
 				  new questionblockobj("Which triangle has the largest area?"),
-				  new questionblockobj("Do these two triangles match?"),
+				  new questionblockobj("Do these two triangles match?"), //Draw html and keyboardlistener behavior changes if it detects the exact text of this question :-( If you change it, change it in those places too. I'm so sorry.
 				 ]);
 nextTrial();
 
