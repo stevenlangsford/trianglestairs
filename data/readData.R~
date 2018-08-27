@@ -1,0 +1,4 @@
+library(tidyverse)
+demographics.df <- read.csv("raw_data/demographicsdata.csv",header=TRUE)
+matchdata.df <- read.csv("matchdata.csv",header=TRUE)
+pairsdata.df <- read.csv("pairsdata.csv",header=TRUE)

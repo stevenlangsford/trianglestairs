@@ -136,7 +136,7 @@ app.get("/getmatchresponses",requireLogin,function(req,res){
 			       responses.push(JSON.parse(result.rows[i].responseobj));
 			   }
 		    var response_csv = json2csv({data: responses, fields:fields});
-		    res.attachment("pairsdata.csv");
+		    res.attachment("matchdata.csv");
 		    res.send(response_csv);
 		}
 	});//end query

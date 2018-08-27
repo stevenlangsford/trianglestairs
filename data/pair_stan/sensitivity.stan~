@@ -1,0 +1,5 @@
+data{
+  int N;
+  real value1[N];
+  real value2[N];
+}

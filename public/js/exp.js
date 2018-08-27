@@ -122,6 +122,7 @@ document.addEventListener('keydown', keyboardListener)
 function matchrecordResponse(mykey){
     var mystim=JSON.parse(currentTrial.summaryobj()) //Sigh.
     var saveMe = {
+	question:currentquestion,
 	EW1:mystim.EastWest1,
 	EW2:mystim.EastWest2,
 	NS1:mystim.NorthSouth1,
@@ -159,6 +160,7 @@ function pairrecordResponse(mykey){//used to pass args, now everything scraped f
     var mystim=JSON.parse(currentTrial.summaryobj()) //WTF is this bouncing in and out of JSON format? I think there used to be a reason, probably intended to save summaryobj directly to db. Sigh.
 
     var saveMe = {
+	question:currentquestion,
 	EW1:mystim.EastWest1,
 	EW2:mystim.EastWest2,
 	NS1:mystim.NorthSouth1,
@@ -420,12 +422,10 @@ function pairtrialobj(triangles,stimid,drawerHTML){
 
     this.drawme = function(targdiv){ //draw happens in two steps: clear the screen, then draw the trial. Avoids blitzing under the new kbd setup aimed at getting RT.
 	document.getElementById(targdiv).innerHTML="+";
-	console.log("pt");
 	setTimeout(this.oknowactuallydrawme.bind(this,targdiv),1000); //Wow, that's some nasty js scoping horror. check browser consistancy?
     }
     
     this.oknowactuallydrawme = function(targdiv){
-	console.log("sweet");
 	drawtime=Date.now();
 	document.getElementById(targdiv).innerHTML = drawerHTML;
 
@@ -669,7 +669,8 @@ var questionblockobj = function(myquestion){
 // 	    					     widths[width1],heights[height1],
 // 	    					     templatelist[i],
 // 	    					     templatelist[j],
-// 	    					     "pair"+templatelist[i]+"vs"+templatelist[j]+"_"+(widths[width1]*heights[height1]/2.0))
+// 	    					     "pair"+templatelist[i]+"vs"+templatelist[j]+"_"+(widths[width1]*heights[height1]/2.0)),
+//    						 myquestion=="Do these two triangles match?" ? matchpairdrawHTML : comparisonpairdrawHTML
 // 	    			    );
 // 		}//width1
 // 	    }//height1
@@ -756,10 +757,10 @@ var questionblockobj = function(myquestion){
 //End triads
 
 var blockindex = 0;
-var all_questionblocks = shuffle([//new questionblockobj("Which triangle is taller?"),
-				  //new questionblockobj("Which triangle is wider?"),
+var all_questionblocks = shuffle([new questionblockobj("Which triangle is taller?"),
+				  new questionblockobj("Which triangle is wider?"),
 				  new questionblockobj("Which triangle has the largest area?"),
-				  new questionblockobj("Do these two triangles match?"), //Draw html and keyboardlistener behavior changes if it detects the exact text of this question :-( If you change it, change it in those places too. I'm so sorry.
+				  new questionblockobj("Do these two triangles match?"), //Drawing html and keyboardlistener behavior change if they detects the exact text of this question :-( If you change it, change it in those places too. I'm so sorry.
 				 ]);
 nextTrial();
 
