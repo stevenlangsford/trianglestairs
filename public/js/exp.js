@@ -637,9 +637,9 @@ var questionblockobj = function(myquestion){
     var attrmin = .8;
     
     var templatelist = ["rightangle","equilateral","skew"];
-    for(var reps=0;reps<10;reps++){
+    for(var reps=0;reps<20;reps++){
 	for(var i=0;i<templatelist.length;i++){
-	    for(var j=0;j<templatelist.length;j++){
+	    for(var j=0;j<=i;j++){ //AB is the same as BA. Cases you want to hit are AA,BB,CC,AB,AC,BC only.
 		this.trials.push(pairtrialgetter(Math.random()*(attrmax-attrmin)+attrmin,
 						 Math.random()*(attrmax-attrmin)+attrmin,
 						 Math.random()*(attrmax-attrmin)+attrmin,

@@ -1,0 +1,19 @@
+library(tidyverse)
+library(rstan)
+library(shinystan)
+
+rm(list=ls())
+load("seepairesttriad_test1.RData")
+
+mysamples <- as.data.frame(extract(fit,permuted=TRUE))
+
+atrial = 1;
+
+ests <- mysamples%>%select(starts_with(paste0("est_trial_option_attribute.",atrial,".")))
+
+widths <- ests%>%select(ends_with(".1"))%>%gather(attribute,est,1:3)
+heights <- ests%>%select(ends_with(".2"))%>%gather(attribute,est,1:3)
+
+widths$attribute <- sapply(widths$attribute,function(x){substr(x,1,nchar(x)-2)})
+heights$attribute <- sapply(heights$attribute,function(x){substr(x,1,nchar(x)-2)})
+
