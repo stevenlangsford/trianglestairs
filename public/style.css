@@ -4,6 +4,7 @@ body {
     font-size:1.5em;
 }
 h1 {
+    width:100%;
     margin-left:auto;
     margin-right:auto;
     text-align:center;
@@ -36,17 +37,23 @@ p {
      justify-content:center;
      padding:20px;
 
-     /* margin:0 auto; */
+     /* margin:auto; */
+     width:100%;
      /* left:50%; */
  }
 
  footer{
+     display:block;
      width:100%;
      margin-left:auto;
      margin-right:auto;
      text-align:center;
-     position:fixed;
+     /* position:fixed; */
      left:0;
      bottom:0;
      
+ }
+ 
+ table{
+     margin: 0 auto;
  }

@@ -16,7 +16,7 @@ function nextTrial(){
 	all_questionblocks[blockindex].runTrial();
 
     }else{
-	$.post("/finish",function(data){window.location.replace(data)});
+	$.post("/exp_triads",function(data){window.location.replace(data)});
     }
     // if(trialindex<maxtrials){
     // 	if(Math.random()<.2&&diadindex<trials.length){//about 1 in 5 or until they run out.
@@ -637,7 +637,7 @@ var questionblockobj = function(myquestion){
     var attrmin = .8;
     
     var templatelist = ["rightangle","equilateral","skew"];
-    for(var reps=0;reps<20;reps++){
+    for(var reps=0;reps<1;reps++){ //20?
 	for(var i=0;i<templatelist.length;i++){
 	    for(var j=0;j<=i;j++){ //AB is the same as BA. Cases you want to hit are AA,BB,CC,AB,AC,BC only.
 		this.trials.push(pairtrialgetter(Math.random()*(attrmax-attrmin)+attrmin,
@@ -757,10 +757,10 @@ var questionblockobj = function(myquestion){
 //End triads
 
 var blockindex = 0;
-var all_questionblocks = shuffle([new questionblockobj("Which triangle is taller?"),
-				  new questionblockobj("Which triangle is wider?"),
+var all_questionblocks = shuffle([//new questionblockobj("Which triangle is taller?"),
+				  //new questionblockobj("Which triangle is wider?"),
 				  new questionblockobj("Which triangle has the largest area?"),
-				  new questionblockobj("Do these two triangles match?"), //Drawing html and keyboardlistener behavior change if they detects the exact text of this question :-( If you change it, change it in those places too. I'm so sorry.
+				  //new questionblockobj("Do these two triangles match?") //Drawing html and keyboardlistener behavior change if they detects the exact text of this question :-( If you change it, change it in those places too. I'm so sorry.
 				 ]);
 nextTrial();
 

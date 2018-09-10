@@ -154,9 +154,19 @@ app.get('/', function (req, res) {
 app.get('/run',function(req,res){
     res.render("pages/exp");
 });
+
+app.get('/run_triads',function(req,res){
+    res.render("pages/exp_triads");
+});
+
 app.post('/exp',function(req,res){
     //not sure why this needs to bounce to a new route to render, but it does seem to. I need to learn some express!
     return res.status(200).send("/run");    
+})
+
+app.post('/exp_triads',function(req,res){
+    //?? bounce bounce why?
+    return res.status(200).send("/run_triads");    
 })
 
 app.get('/done',function(req,res){

@@ -19,7 +19,6 @@ calcobs.df = data.frame(trialid=c(),optionid=c(),value=c(),noisesd=c())
 ordobs.df = data.frame(trialid=c(),option1=c(),option2=c(),attribute=c(),value=c(),noisesd=c(),tolerance=c())
 
 ##sim stim
-##These demo stim made sense for sum land and you're now in product land, they need re-doing.
 rawstim.df <- read.csv("demostim.csv")
 rawstim.df$trialid=1:nrow(rawstim.df)
 
