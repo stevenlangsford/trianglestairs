@@ -1,41 +1,25 @@
 data{
   //pairs info
-  int N;
-  real diff[N]; //value1 - value2. Check the units are ok! (they should be on stan-scale, ie near 1)
-  int choice[N]; //1,2,3 === <,=,> for order area1 vs area2
-
+  real<lower=0> sigma; //how to pass a distribution instead of a point estimate? If you use a local dist object, it'll update?
+  real<lower=0> tolerance;
+  
   //Triad info:
   int hm_triads;
   vector[3] calcobs[hm_triads]; //this is true values, should be turned into a noisy calcobs locally with noise level estimated from pairs?
-  int hm_ordobs;
-  int ord_trialid[hm_ordobs];
-  int ord_option1[hm_ordobs];
-  int ord_option2[hm_ordobs];
-  int ord_attribute[hm_ordobs];
-  real ord_status[hm_ordobs]; //passed as (acurate) difference in value, convert to discreet ordobs with reference to tolerance value, estimated from pairs.
+  /* int hm_ordobs; */ //tried just passing 0 here, doesn't work, so, copy-paste time. Sigh. Oh well.
+  /* int ord_trialid[hm_ordobs]; */
+  /* int ord_option1[hm_ordobs]; */
+  /* int ord_option2[hm_ordobs]; */
+  /* int ord_attribute[hm_ordobs]; */
+  /* real ord_status[hm_ordobs]; //passed as (acurate) difference in value, convert to discreet ordobs with reference to tolerance value, estimated from pairs. */
 }
 parameters{
-  real<lower=0> sigma; //single-ppnt version: consider hierarchical to pool over ppnts!
-  real<lower=0> tolerance; //sigma and tolerance estimated from pairs data, applied to triad predictions
-
-  vector[3] estval[hm_triads];//triad option estimated values
-  matrix[3,2] est_trial_option_attribute[hm_triads];
+  vector<lower=0>[3] estval[hm_triads];//triad option estimated values. limit is if values are interpretable as areas, consider also standardized version, in which case '0' is 'average size' and negative numbers 'smaller than expected'.
+  matrix<lower=0>[3,2] est_trial_option_attribute[hm_triads];
 }
 model{
-  //pair vars
-  vector[3] ordprob_pairs[N];//For pair discrimination
-  vector[3] ordprob_triads[hm_ordobs];//for generating triad predictions.
-  
-  //pair model
-  sigma~student_t(3,0,1);//somewhat-heavy-tailed folded-t noise prior. Ok?
-  tolerance~student_t(3,0,1); //Um. What's a good prior for this?
-  for(i in 1:N){
-    ordprob_pairs[i,1] = normal_cdf(-tolerance,diff[i],sigma);
-    ordprob_pairs[i,2] = normal_cdf(tolerance,diff[i],sigma)-ordprob_pairs[i,1];
-    ordprob_pairs[i,3] = 1-normal_cdf(tolerance,diff[i],sigma);
-    choice[i]~categorical(ordprob_pairs[i]);
-  }
-  
+    vector[3] ordprob_triads[hm_ordobs];//for generating triad predictions.
+
   //triad model
   for(atrial in 1:hm_triads){
     for(anoption in 1:3){
@@ -70,8 +54,12 @@ model{
 
 generated quantities{
   int triad_choice[hm_triads];
-  //TODO generate a choice based on estval
-  for( atrial in 1:hm_triads){
-    triad_choice[atrial]=categorical_logit_rng(estval[atrial]); // consider ^alpha to shift towards hardmax, arbitrary?
+  vector[3] estval_tracker[hm_triads];
+  
+  for(atrial in 1:hm_triads){
+    for(anoption in 1:3){
+      estval_tracker[atrial,anoption]=(est_trial_option_attribute[atrial,anoption,1]*est_trial_option_attribute[atrial,anoption,2]/2)^7;//^7 makes this more hardmax, arbitrary param...
+    }
+    triad_choice[atrial]=categorical_logit_rng(estval_tracker[atrial]);     
   }
 }//end gen quantities

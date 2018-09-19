@@ -1,9 +1,8 @@
 data{
   //pairs info
-  int N;
-  real diff[N]; //value1 - value2. Check the units are ok! (they should be on stan-scale, ie near 1)
-  int choice[N]; //1,2,3 === <,=,> for order area1 vs area2
-
+  real<lower=0> sigma; //how to pass a distribution instead of a point estimate? If you use a local dist object, it'll update?
+  real<lower=0> tolerance;
+  
   //Triad info:
   int hm_triads;
   vector[3] calcobs[hm_triads]; //this is true values, should be turned into a noisy calcobs locally with noise level estimated from pairs?
@@ -13,29 +12,23 @@ data{
   int ord_option2[hm_ordobs];
   int ord_attribute[hm_ordobs];
   real ord_status[hm_ordobs]; //passed as (acurate) difference in value, convert to discreet ordobs with reference to tolerance value, estimated from pairs.
+
+  int triad_choice[hm_triads];
+  int matchstatus[hm_ordobs];
 }
 parameters{
-  real<lower=0> sigma; //single-ppnt version: consider hierarchical to pool over ppnts!
-  real<lower=0> tolerance; //sigma and tolerance estimated from pairs data, applied to triad predictions
-
-  vector[3] estval[hm_triads];//triad option estimated values
-  matrix[3,2] est_trial_option_attribute[hm_triads];
+  vector<lower=0>[3] estval[hm_triads];//triad option estimated values. limit is if values are interpretable as areas, consider also standardized version, in which case '0' is 'average size' and negative numbers 'smaller than expected'.
+  matrix<lower=0>[3,2] est_trial_option_attribute[hm_triads];
+  real<lower=0,upper=1> usematchord;
+  real<lower=0,upper=1> usenonmatchord;
 }
 model{
-  //pair vars
-  vector[3] ordprob_pairs[N];//For pair discrimination
-  vector[3] ordprob_triads[hm_ordobs];//for generating triad predictions.
-  
-  //pair model
-  sigma~student_t(3,0,1);//somewhat-heavy-tailed folded-t noise prior. Ok?
-  tolerance~student_t(3,0,1); //Um. What's a good prior for this?
-  for(i in 1:N){
-    ordprob_pairs[i,1] = normal_cdf(-tolerance,diff[i],sigma);
-    ordprob_pairs[i,2] = normal_cdf(tolerance,diff[i],sigma)-ordprob_pairs[i,1];
-    ordprob_pairs[i,3] = 1-normal_cdf(tolerance,diff[i],sigma);
-    choice[i]~categorical(ordprob_pairs[i]);
-  }
-  
+    vector[3] ordprob_triads[hm_ordobs];//for generating triad predictions.
+    vector[3] estval_tracker[hm_triads];
+    
+    usematchord~beta(1,1);
+    usenonmatchord~beta(1,1);
+      
   //triad model
   for(atrial in 1:hm_triads){
     for(anoption in 1:3){
@@ -63,15 +56,20 @@ model{
     ordprob_triads[anobs,3]=0.001+1-normal_cdf(tolerance,est_trial_option_attribute[ord_trialid[anobs],ord_option1[anobs],ord_attribute[anobs]]-est_trial_option_attribute[ord_trialid[anobs],ord_option2[anobs],ord_attribute[anobs]],sigma);
 
     ordprob_triads[anobs] = ordprob_triads[anobs]/sum(ordprob_triads[anobs]); //normalize necessary after adding fudge factor...
-        target += categorical_lpmf(fabs(ord_status[anobs])<tolerance ? 2 : ord_status[anobs] < 0 ? 1 : 3 | ordprob_triads[anobs]);//Before the pipe:  true relation between options 1 & 2 on target attribute {1:'<',2:'=',3:'>'}, passed in as data. After pipe: the probability of each outcome given the current attribute estimates. Results in a reward being added to target when ests are consistent with true ordinal relations.
+    if(matchstatus[anobs]==1){ //is this product thing sane?
+      target += bernoulli_lpmf(1|usematchord)+categorical_lpmf(fabs(ord_status[anobs])<tolerance ? 2 : ord_status[anobs] < 0 ? 1 : 3 | ordprob_triads[anobs]);//Before the pipe:  true relation between options 1 & 2 on target attribute {1:'<',2:'=',3:'>'}, passed in as data. After pipe: the probability of each outcome given the current attribute estimates. Results in a reward being added to target when ests are consistent with true ordinal relations. Bernoulli_lmpf is just log(theta), expressed this way because it seemed easier to think about incrementing target in a consistent way? Sum of logs is product of probs: total increment of target should mean: prob-used-this-obs-and-saw-this-relation.
+    }else{
+      target += bernoulli_lpmf(1|usenonmatchord)+categorical_lpmf(fabs(ord_status[anobs])<tolerance ? 2 : ord_status[anobs] < 0 ? 1 : 3 | ordprob_triads[anobs]);
+    }
   }//end for each ordobs
+
+
+  //observe the choice:
+  for(atrial in 1:hm_triads){
+    for(anoption in 1:3){
+      estval_tracker[atrial,anoption]=(est_trial_option_attribute[atrial,anoption,1]*est_trial_option_attribute[atrial,anoption,2]/2)^7;//^7 makes this more hardmax, arbitrary param...
+    }
+    triad_choice[atrial]~categorical_logit(estval_tracker[atrial]);     
+  }
   
 }//end model block
-
-generated quantities{
-  int triad_choice[hm_triads];
-  //TODO generate a choice based on estval
-  for( atrial in 1:hm_triads){
-    triad_choice[atrial]=categorical_logit_rng(estval[atrial]); // consider ^alpha to shift towards hardmax, arbitrary?
-  }
-}//end gen quantities

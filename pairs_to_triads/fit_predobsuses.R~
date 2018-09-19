@@ -1,7 +1,9 @@
-rm(list=ls())
-source("readData.R")
+library(tidyverse)
 library(rstan)
 library(shinystan)
+
+rm(list=ls())
+source("readData.R")
 
 ##Filter to a single participant... for now.
 targid = demographics.df$ppntID[1]
@@ -55,8 +57,11 @@ triadsdata.df <- triadsdata.df%>%mutate(
                                      scaled.EW2=EastWest2/sqrt(scalingconstant),
                                      scaled.EW3=EastWest3/sqrt(scalingconstant)
                                  )
+triadsdata.df$choicenumber <- as.numeric(ordered(triadsdata.df$rolechosen,levels=c("targ","comp","decoy")))
+
 calcobs <- matrix(,nrow=nrow(triadsdata.df),ncol=3)
 ordobs.df <- data.frame()
+ordobs_matches.df <- data.frame()
 
 for(i in 1:nrow(triadsdata.df)){
     calcobs[i,1]=triadsdata.df[i,"scaled.area1"]
@@ -69,50 +74,72 @@ for(i in 1:nrow(triadsdata.df)){
                option1id=1,
                option2id=2,
                ord_attribute=1,
-               ord_status=triadsdata.df[i,"scaled.NS1"]-triadsdata.df[i,"scaled.NS2"])
+               ord_status=triadsdata.df[i,"scaled.NS1"]-triadsdata.df[i,"scaled.NS2"],
+               matchstatus=triadsdata.df[i,"templatetype1"]==triadsdata.df[i,"templatetype2"]
+               )
     ##ord 1-3
     ordNS13 <- data.frame(trialid=i,
                option1id=1,
                option2id=3,
                ord_attribute=1,
-               ord_status=triadsdata.df[i,"scaled.NS1"]-triadsdata.df[i,"scaled.NS3"])
+               ord_status=triadsdata.df[i,"scaled.NS1"]-triadsdata.df[i,"scaled.NS3"],
+               matchstatus=triadsdata.df[i,"templatetype1"]==triadsdata.df[i,"templatetype3"])
     ##ord 2-3
     ordNS23 <- data.frame(trialid=i,
                option1id=2,
                option2id=3,
                ord_attribute=1,
-               ord_status=triadsdata.df[i,"scaled.NS2"]-triadsdata.df[i,"scaled.NS3"])
+               ord_status=triadsdata.df[i,"scaled.NS2"]-triadsdata.df[i,"scaled.NS3"],
+               matchstatus=triadsdata.df[i,"templatetype2"]==triadsdata.df[i,"templatetype3"])
 ##East-West attribute:
         ##ord 1-2
     ordEW12 <- data.frame(trialid=i,
                option1id=1,
                option2id=2,
                ord_attribute=2,
-               ord_status=triadsdata.df[i,"scaled.EW1"]-triadsdata.df[i,"scaled.EW2"])
+               ord_status=triadsdata.df[i,"scaled.EW1"]-triadsdata.df[i,"scaled.EW2"],
+               matchstatus=triadsdata.df[i,"templatetype1"]==triadsdata.df[i,"templatetype2"])
     ##ord 1-3
     ordEW13 <- data.frame(trialid=i,
                option1id=1,
                option2id=3,
                ord_attribute=2,
-               ord_status=triadsdata.df[i,"scaled.EW1"]-triadsdata.df[i,"scaled.EW3"])
+               ord_status=triadsdata.df[i,"scaled.EW1"]-triadsdata.df[i,"scaled.EW3"],
+               matchstatus=triadsdata.df[i,"templatetype1"]==triadsdata.df[i,"templatetype3"])
     ##ord 2-3
     ordEW23 <- data.frame(trialid=i,
                option1id=2,
                option2id=3,
                ord_attribute=2,
-               ord_status=triadsdata.df[i,"scaled.EW2"]-triadsdata.df[i,"scaled.EW3"])
+               ord_status=triadsdata.df[i,"scaled.EW2"]-triadsdata.df[i,"scaled.EW3"],
+               matchstatus=triadsdata.df[i,"templatetype2"]==triadsdata.df[i,"templatetype3"])
 
-    ##TODO: only add ordobs when templates match?
+    
     ordobs.df <- rbind(ordobs.df,ordNS12,ordNS13,ordNS23,ordEW12,ordEW13,ordEW23)
 }##end for each triad
 
+ordobs_matches.df <- filter(ordobs.df,matchstatus==TRUE)
+
+
+## datalist_pairs <- list(
+##     N=nrow(pairsdata.df),
+##     diff = pairsdata.df$diff,
+##     choice = pairsdata.df$choice#,
+## )
+
+## fit <- stan(file="seepairs_getests.stan",
+##             data=datalist_pairs,
+##             iter=1000,
+##             chains=4
+##             )
+
+## pairsamples <- as.data.frame(rstan::extract(fit,permuted=TRUE))
+
+pairsamples <- data.frame(sigma=.1,tolerance=.1) #DEV CHEAT
 
 datalist <- list(
-    ##pairs
-    N=nrow(pairsdata.df),
-    diff = pairsdata.df$diff,
-    choice = pairsdata.df$choice,
-    ##triads
+    sigma=mean(pairsamples$sigma),#POINTEST HACK
+    tolerance=mean(pairsamples$tolerance),#POINTEST HACK
     hm_triads = nrow(triadsdata.df),
     calcobs=calcobs,
     hm_ordobs=nrow(ordobs.df),
@@ -120,10 +147,12 @@ datalist <- list(
     ord_option1=ordobs.df$option1id,
     ord_option2=ordobs.df$option2id,
     ord_attribute=ordobs.df$ord_attribute,
-    ord_status=ordobs.df$ord_status    
+    ord_status=ordobs.df$ord_status,
+    triad_choice=triadsdata.df$choicenumber,
+    matchstatus=as.numeric(ordobs.df$matchstatus)#note this is still a todo
 )
 
-fit <- stan(file="seepairs_esttriads.stan",
+triadfit_obsuse <- stan(file="seetriads_predictobsuse.stan",
             data=datalist,
             iter=1000,
             chains=4,
@@ -135,4 +164,4 @@ fit <- stan(file="seepairs_esttriads.stan",
             control=list(max_treedepth=15)
             )
 
-save.image(file="demofit.RData")
+save.image(file="ordusefit.RData")
