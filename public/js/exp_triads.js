@@ -1,24 +1,21 @@
 console.log("welcome to triads")
-// //Generic sequence-of-trials
-// //If that's all you want, all you need to edit is the makeTrial object and the responseListener. Give maketrial an appropriate constructor that accept the key trial properties, a drawMe function, and something that will hit responseListener.
-// //then put a list of trial-property-setter entries in 'stim' and you're golden.
+//exp level setup args:
 
-// var trials = [];
- var trialindex = 0;
+var timeout_penalty = 5000; //infuriating enforced pause on timeout screen.
+var timeout_master_time = 4000; //this value is passed to the constructor of any trialobj objects in time-pressure blocks. The similar-looking timeout_time is the global state var timepressure_loop polls continously to see if the current trial has timed out yet: this value is set by each trialobj when it draws so they can be different.
 
-// function responseListener(aresponse){//global so it'll be just sitting here available for the trial objects to use. So, it must accept whatever they're passing.
-// //    console.log("responseListener heard: "+aresponse); //diag
-//     trials[trialindex].response = aresponse;
-//     trials[trialindex].responseTime= Date.now();
-    
-//     $.post('/response',{myresponse:JSON.stringify(trials[trialindex])},function(success){
-//     	console.log(success);//For now server returns the string "success" for success, otherwise error message.
-//     });
-    
-//     //can put this inside the success callback, if the next trial depends on some server-side info.
-//     trialindex++; //increment index here at the last possible minute before drawing the next trial, so trials[trialindex] always refers to the current trial.
-//     nextTrial();
-// }
+//global state args (there are more scattered throughout, so sorry)
+var trialindex = 0; //refers to trials[], defined (much) later Incremented by nextTrial()
+var timeout_time = Infinity; //Trialobj draw resets this for the timpressure loop to reference
+
+function transitionscreen(message){ //has a drawme fn exactly like a trialobj. If you're populating trials[] with more than one block type, whack one of these in between the blocks.
+
+    this.message = message;
+    this.drawme = function(targdiv){
+	drawtime=Infinity; //switch off any outstanding timeouts.
+	document.getElementById(targdiv).innerHTML="<p>"+message+"</p><br/><button onclick='nextTrial()'>Continue</button>";
+    }
+}
 
 function nextTrial(){
     if(trialindex<trials.length){
@@ -28,6 +25,21 @@ function nextTrial(){
     }else{
 	$.post("/finish",function(data){window.location.replace(data)});
     }
+}
+
+function timepressure_loop(){
+    if(Date.now()-drawtime > timeout_time){ //requires drawtime to be up to date.
+	timeout_screen();
+    }
+    setTimeout(timepressure_loop,10);//interval sets poll rate. Amazingly, recursive timeout is preferred to setInterval according to http://bonsaiden.github.io/JavaScript-Garden/
+}
+
+timepressure_loop(); //go ahead and start polling this on page load.
+
+function timeout_screen(){
+    drawtime=Infinity; //all timepressure polls will decide Date.now() is less than drawtime+timeout... until a redraw resets drawtime.
+	document.getElementById("uberdiv").innerHTML = "<div style='background-color:red;'><h1'>Timeout</h1><p>This is a timed block. For these trials, be as accurate as you can without going over the "+(timeout_master_time/1000)+" second time limit.</p></div>"
+	setTimeout(nextTrial,timeout_penalty);
 }
 
 // // a trial object should have a drawMe function and a bunch of attributes.
@@ -90,7 +102,7 @@ function linelength(x1,y1,x2,y2){
     return Math.sqrt(a*a+b*b)
 }
 
-var drawtime = "init";
+var drawtime = Infinity; //arbitrary init set to a large number so timeout will definitely never trigger before a draw event resets this to now-ish.
 function recordResponse(positionchosen,stimsummary,stimid){
     stimsummary = JSON.parse(stimsummary); //from JSON string back into an object. Because trying to return 'this' from the trialobj summary fn was terrifying, easier/safer to pass a string and reconstitute it here, add whatever response-recording attributes you want and then pass to db as an object.
 
@@ -255,11 +267,6 @@ function pairtrialobj(triangles,stimid){
 							     rightcanvas.width/2-this.triangles[this.presentation_position[1]].leftmost()/2+Math.random()*jitter-jitter/2,
 							     rightcanvas.height/2-this.triangles[this.presentation_position[1]].lowest()/2+Math.random()*jitter-jitter/2,
 							     "black");
-	
-	setTimeout(function(){
-	    var responsebuttons = document.getElementsByClassName("responsebutton");
-	    for(var i=0;i<responsebuttons.length;i++)responsebuttons[i].disabled=false;
-	},1000)
     }
 
     this.summaryobj = function(){
@@ -304,21 +311,24 @@ function pairtrialobj(triangles,stimid){
     }
 }
 
-function trialobj(triangles,roles,stimid,decoydist){ //responsible for drawing to screen, including randomization of locations and starting orientation. Also TODO here recording responses.
+function trialobj(triangles,roles,stimid,decoydist,timelimit){ //responsible for drawing to screen, including randomization of locations and starting orientation. Also TODO here recording responses.
+
     this.triangles = triangles;
     this.roles = roles;
     this.presentation_position = shuffle([0,1,2]);
     this.stimid = stimid;
     this.hm_rotations = shuffle([0,1,2,3])[0]; //canonical orientation is tall (N), randomize so NSEW versions all presented.
     this.decoydist = decoydist;
+    this.timelimit = timelimit;
     
     for(var i=0;i<this.hm_rotations;i++){
     	for(var j=0;j<this.triangles.length;j++)this.triangles[j]=this.triangles[j].cloneme().rotate90();//whee
     }
 
     this.drawme = function(targdiv){
+	timeout_time=timelimit; //trial objs are in control of when they want to time out. Infinity for 'never'.
 	drawtime=Date.now();//public, visible to response-recording function. Which also records response time when hit, so between them you have total view time.
-	document.getElementById(targdiv).innerHTML = "<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
+	document.getElementById(targdiv).innerHTML = "<table style='border:solid 3px "+(this.timelimit < Infinity ? "red" : "black")+"'>"+//haha, tables. Oh dear.
 	"<tr><td colspan='2' align='center' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
 	    "<tr><td colspan='2' align='center'><canvas id='stimcanvas' width='"+canvassize+"' height='"+canvassize+"'></canvas></td></tr>"+
 	    "<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td><td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('2','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
@@ -334,7 +344,7 @@ function trialobj(triangles,roles,stimid,decoydist){ //responsible for drawing t
 	//     "</tr>"+
 	//     "<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td> <td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('2','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
 	//     "</table></br>";
-	
+
 	var d = canvassize/5; //distance apart
 	var jitter = 10; //jitter less critical now that there's no clear alignment issue, but might be nice mitigation of possible orientation dist-artifacts.
 	var rot_offset = Math.PI;
@@ -403,11 +413,12 @@ function trialobj(triangles,roles,stimid,decoydist){ //responsible for drawing t
 	this.presentation2 = this.presentation_position[1];
 	this.presentation3 = this.presentation_position[2];
 
+	this.timelimit = this.timelimit;
 	return(JSON.stringify(this)); //could mess with this if it's convenient? This seems like a nice conservative way to get everything though.
     }
 }
 
-function trialgetter(x1,y1,x2,y2,x3,y3,shapetypes,roles,orientations,stimid,decoydist){
+function trialgetter(x1,y1,x2,y2,x3,y3,shapetypes,roles,orientations,stimid,decoydist,timelimit){
     //triangles,roles,stimid
     var shape_mapping = shuffle(["rightangle","equilateral","skew"])
 
@@ -422,7 +433,7 @@ function trialgetter(x1,y1,x2,y2,x3,y3,shapetypes,roles,orientations,stimid,deco
     var mytriangles = [new triangle(x1,y1,shape_mapping[shapetypes[0]],orientations[0]),
 		       new triangle(x2,y2,shape_mapping[shapetypes[1]],orientations[1]),
 		       new triangle(x3,y3,shape_mapping[shapetypes[2]],orientations[2])];
-    return new trialobj(mytriangles,roles,stimid,decoydist)
+    return new trialobj(mytriangles,roles,stimid,decoydist,timelimit);
 		       
 }
 
@@ -454,10 +465,19 @@ var trials = [];
 // }
 
 //add triad stim: generated by stim_setup.R
-var triads = [trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes000','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes001','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes010','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes100','0.9'),trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes012','0.9'),trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes000','0.8'),trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes001','0.8'),trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes010','0.8'),trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes100','0.8'),trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes012','0.8'),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes000','0.7'),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes001','0.7'),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes010','0.7'),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes100','0.7'),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes012','0.7'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes000','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes001','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes010','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes100','-0.025'),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes012','-0.025'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes000','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes001','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes010','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes100','-0.05'),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes012','-0.05'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes000','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes001','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes010','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes100','-0.1'),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes012','-0.1'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes000','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes001','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes010','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes100','-0.15'),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes012','-0.15'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes000','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes001','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes010','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes100','1.1'),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes012','1.1'),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes000','1.2'),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes001','1.2'),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes010','1.2'),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes100','1.2'),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes012','1.2'),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes000','1.3'),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes001','1.3'),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes010','1.3'),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes100','1.3'),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes012','1.3')]
+var triads = [new transitionscreen("This is a timed block"),
+	      trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes000','0.9',timeout_master_time),
+	      trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes001','0.9',timeout_master_time),
+	      trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes010','0.9',timeout_master_time),
+	      new transitionscreen("This is an untimed block"),
+	      trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes100','0.9',Infinity),
+	      trialgetter(1,0.5,1,0.5,0.948683298050514,0.474341649025257,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.9shapes012','0.9',Infinity),
+	      trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes000','0.8',Infinity)]
+
+//,trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes001','0.8',timeout_master_time),trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes010','0.8',timeout_master_time),trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes100','0.8',timeout_master_time),trialgetter(1,0.5,1,0.5,0.894427190999916,0.447213595499958,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.8shapes012','0.8',timeout_master_time),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes000','0.7',timeout_master_time),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes001','0.7',timeout_master_time),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes010','0.7',timeout_master_time),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes100','0.7',timeout_master_time),trialgetter(1,0.5,1,0.5,0.836660026534076,0.418330013267038,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'attraction0.7shapes012','0.7',timeout_master_time),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes000','-0.025',timeout_master_time),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes001','-0.025',timeout_master_time),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes010','-0.025',timeout_master_time),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes100','-0.025',timeout_master_time),trialgetter(1,0.5,1,0.5,0.975,0.512820512820513,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.025shapes012','-0.025',timeout_master_time),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes000','-0.05',timeout_master_time),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes001','-0.05',timeout_master_time),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes010','-0.05',timeout_master_time),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes100','-0.05',timeout_master_time),trialgetter(1,0.5,1,0.5,0.95,0.526315789473684,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.05shapes012','-0.05',timeout_master_time),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes000','-0.1',timeout_master_time),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes001','-0.1',timeout_master_time),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes010','-0.1',timeout_master_time),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes100','-0.1',timeout_master_time),trialgetter(1,0.5,1,0.5,0.9,0.555555555555556,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.1shapes012','-0.1',timeout_master_time),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes000','-0.15',timeout_master_time),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes001','-0.15',timeout_master_time),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes010','-0.15',timeout_master_time),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes100','-0.15',timeout_master_time),trialgetter(1,0.5,1,0.5,0.85,0.588235294117647,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'compromise-0.15shapes012','-0.15',timeout_master_time),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes000','1.1',timeout_master_time),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes001','1.1',timeout_master_time),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes010','1.1',timeout_master_time),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes100','1.1',timeout_master_time),trialgetter(1,0.5,1,0.5,1.04880884817015,0.524404424085076,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.1shapes012','1.1',timeout_master_time),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes000','1.2',timeout_master_time),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes001','1.2',timeout_master_time),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes010','1.2',timeout_master_time),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes100','1.2',timeout_master_time),trialgetter(1,0.5,1,0.5,1.09544511501033,0.547722557505166,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.2shapes012','1.2',timeout_master_time),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['0','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes000','1.3',timeout_master_time),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['0','0','1'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes001','1.3',timeout_master_time),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['0','1','0'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes010','1.3',timeout_master_time),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['1','0','0'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes100','1.3',timeout_master_time),trialgetter(1,0.5,1,0.5,1.14017542509914,0.570087712549569,['0','1','2'],['targ','comp','decoy'],['0','1','0'],'winner1.3shapes012','1.3',timeout_master_time)]
 
 
 //Go!
 for(var i=0;i<triads.length;i++)trials.push(triads[i])
-shuffle(trials);
+//shuffle(trials);
 nextTrial();
