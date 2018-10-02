@@ -1,5 +1,5 @@
 library(tidyverse)
-##rm(list=ls())
+rm(list=ls())
 
 demographics.df <- read.csv("raw_data/demographicsdata.csv",header=TRUE)
 pairsdata.df <- read.csv("raw_data/pairsdata.csv",header=TRUE)

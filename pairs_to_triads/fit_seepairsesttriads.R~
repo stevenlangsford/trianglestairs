@@ -1,13 +1,25 @@
+library(tidyverse)
 library(rstan)
 library(shinystan)
 
 rm(list=ls())
 source("readData.R")
 
-##Filter to a single participant... for now.
+##Filter to a single participant for now. Just loop over this is ok... until you want to go hierachical! Which is probably a good idea?
 targid = demographics.df$ppntID[1]
 pairsdata.df <- filter(pairsdata.df,ppntid==targid)
-triadsdata.df <- filter(triadsdata.df,ppntID==targid)#Gods, get yourself a case convetion. Sheesh.
+
+##One way to avoid copy-paste and make sure triads get fit separately for each timepressure condition: change the meaning of this var and loop over possibilites
+##triadsdata.df <- filter(triadsdata.df,ppntID==targid)#Gods, get yourself a case convention. Sheesh.
+master_triadsdata.df <- filter(triadsdata.df,ppntID==targid)#Gods, get yourself a case convention. Sheesh.
+
+for(conditionflag in c("timepressure","notimepressure")){
+    if(conditionflag=="timepressure"){ #flagstrings-if combo ugly but convenient to tag saved outputs with the conditionflag.
+        triadsdata.df <- filter(master_triadsdata.df,timelimit==2000)#2000 and NA are magic numbers marking timed and untimed. yuk.
+    }else{
+        triadsdata.df <- filter(master_triadsdata.df,is.na(timelimit))
+    }
+
 
 ##step one: get the information the model needs out of the saved data
 
@@ -147,8 +159,7 @@ fit <- stan(file="seepairs_getests.stan",
             ## control=list(max_treedepth=15)
             )
 
-
-pairsamples <- as.data.frame(extract(fit,permuted=TRUE))
+pairsamples <- as.data.frame(rstan::extract(fit,permuted=TRUE))
 
 datalist_allords <- list(
     ##pairs
@@ -219,16 +230,10 @@ triadfit_matchords <- stan(file="seeests_predicttriads.stan",
     sigma=mean(pairsamples$sigma),#POINTEST HACK
     tolerance=mean(pairsamples$tolerance),#POINTEST HACK
     hm_triads = nrow(triadsdata.df),
-    calcobs=calcobs,
-    hm_ordobs=0,
-    ord_trialid=0,
-    ord_option1=0,
-    ord_option2=0,
-    ord_attribute=0,
-    ord_status=0
+    calcobs=calcobs
 )
 
-triadfit_noords <- stan(file="seeests_predicttriads.stan",
+triadfit_noords <- stan(file="seeests_predicttriads_NOORD.stan",
             data=datalist_noords,
             iter=1000,
             chains=4,
@@ -241,4 +246,6 @@ triadfit_noords <- stan(file="seeests_predicttriads.stan",
             )
 
 
-save.image(file="pair_paramests.RData")
+save.image(file=paste0(targid,conditionflag,"sawpairs_predictedtriads.RData"))
+
+}

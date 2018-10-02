@@ -5,10 +5,21 @@ library(shinystan)
 rm(list=ls())
 source("readData.R")
 
-##Filter to a single participant... for now.
-targid = demographics.df$ppntID[1]
+##Filter to a single participant for now. Just loop over this is ok... until you want to go hierachical! Which is probably a good idea?
+for(targid in demographics.df$ppntID){
+source("readData.R")#for some reason you thought it was ok to overwrite data dfs with filtered-to-this-run versions. This is the downside of post-fitting loops.
 pairsdata.df <- filter(pairsdata.df,ppntid==targid)
-triadsdata.df <- filter(triadsdata.df,ppntID==targid)#Gods, get yourself a case convetion. Sheesh.
+
+##One way to avoid copy-paste and make sure triads get fit separately for each timepressure condition: change the meaning of triadsdata.df and loop over possibilites
+master_triadsdata.df <- filter(triadsdata.df,ppntID==targid)#Gods, get yourself a case convention. Sheesh.
+
+for(conditionflag in c("timepressure","notimepressure")){
+    if(conditionflag=="timepressure"){ #flagstrings-if combo ugly but convenient to tag saved outputs with the conditionflag.
+        triadsdata.df <- filter(master_triadsdata.df,timelimit==2000)#2000 and NA are magic numbers marking timed and untimed. yuk.
+    }else{
+        triadsdata.df <- filter(master_triadsdata.df,is.na(timelimit))
+    }
+
 
 ##step one: get the information the model needs out of the saved data
 
@@ -235,4 +246,7 @@ triadfit_noords <- stan(file="seeests_predicttriads_NOORD.stan",
             )
 
 
-save.image(file="pair_paramests.RData")
+save.image(file=paste0(targid,conditionflag,"sawpairs_predictedtriads.RData"))
+
+}#for each timecondition
+}#for each targid

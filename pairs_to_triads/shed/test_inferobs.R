@@ -1,8 +1,32 @@
 library(tidyverse)
 library(rstan)
 library(shinystan)
-
+library(patchwork)
 rm(list=ls())
+load("pair_paramests.RData")
+
+##Cheat by taking the max-prob answer rather than a representative sample to make these more distinctive: the data are limited, at least try to give inferobs a fighting chance. Of course, if it works, have to try relaxing this...
+allwinner_choices <- function(triadfit){
+predsamples <- as.data.frame(rstan::extract(triadfit,permute=TRUE))%>%
+    select(starts_with("triad"))%>%
+    gather(triad,choice)%>%
+    group_by(triad)%>%
+    summarize(targ=sum(choice==1)/n(),
+              comp=sum(choice==2)/n(),
+              decoy=sum(choice==3)/n())%>%#Pretty sure this labelling is right but for the love of all things scientific do double check it.
+    ungroup()%>%mutate(triad=substr(triad,7,nchar(triad)))
+return(
+    sapply(1:nrow(predsamples),function(i){prefs <- predsamples[i,c("targ","comp","decoy")]; return(which(prefs==max(prefs))[1]);}) #danger,nonrandom tiebreaker on max (should be rare?)
+    )
+}
+
+allords <- allwinner_choices(triadfit_allords)
+noords <- allwinner_choices(triadfit_noords)
+matchords <- allwinner_choices(triadfit_matchords)
+
+
+###This next is copypaste from inferobs, which works on exp data. Here, swap in all, no and matchords.
+
 source("readData.R")
 
 ##Filter to a single participant... for now.
@@ -135,7 +159,7 @@ ordobs_matches.df <- filter(ordobs.df,matchstatus==TRUE)
 
 ## pairsamples <- as.data.frame(rstan::extract(fit,permuted=TRUE))
 
-pairsamples <- data.frame(sigma=.1,tolerance=.1) #DEV CHEAT
+pairsamples <- data.frame(sigma=.1,tolerance=.1) #DEV CHEAT: now need to check the impact of this on infer obs use?
 
 datalist <- list(
     sigma=mean(pairsamples$sigma),#POINTEST HACK
@@ -149,10 +173,14 @@ datalist <- list(
     ord_attribute=ordobs.df$ord_attribute,
     ord_status=ordobs.df$ord_status,
     triad_choice=triadsdata.df$choicenumber,
-    matchstatus=as.numeric(ordobs.df$matchstatus)#note this is still a todo
+    matchstatus=as.numeric(ordobs.df$matchstatus)
 )
 
-triadfit_obsuse <- stan(file="seetriads_predictobsuse.stan",
+
+
+datalist$triad_choice <- allords;
+
+obsuse_all <- stan(file="seetriads_predictobsuse.stan",
             data=datalist,
             iter=1000,
             chains=4,
@@ -161,7 +189,37 @@ triadfit_obsuse <- stan(file="seetriads_predictobsuse.stan",
                 dim(initattrs)=c(nrow(triadsdata.df),3,2)
                 list(est_trial_option_attribute=initattrs)
             },##Sanity check on these inits: hist(with(triadsdata.df,c(scaled.NS1,scaled.NS2,scaled.NS3,scaled.EW1,scaled.EW2,scaled.EW3)))
-            control=list(max_treedepth=15,adapt_delta=.99)
+            control=list(max_treedepth=18,adapt_delta=.99)
+            )
+save.image(file="testing_inferobs.RData")
+
+
+datalist$triad_choice <- noords;
+obsuse_no <- stan(file="seetriads_predictobsuse.stan",
+            data=datalist,
+            iter=1000,
+            chains=4,
+            init=function(){
+                initattrs <- rep(1,nrow(triadsdata.df)*3*2) #trials * options * attributes. Need to consider what counts as a good init value!
+                dim(initattrs)=c(nrow(triadsdata.df),3,2)
+                list(est_trial_option_attribute=initattrs)
+            },##Sanity check on these inits: hist(with(triadsdata.df,c(scaled.NS1,scaled.NS2,scaled.NS3,scaled.EW1,scaled.EW2,scaled.EW3)))
+            control=list(max_treedepth=18,adapt_delta=.99)
+            )
+save.image(file="testing_inferobs.RData")#overwrite previous.
+
+datalist$triad_choice <- matchords;
+
+obsuse_match <- stan(file="seetriads_predictobsuse.stan",
+            data=datalist,
+            iter=1000,
+            chains=4,
+            init=function(){
+                initattrs <- rep(1,nrow(triadsdata.df)*3*2) #trials * options * attributes. Need to consider what counts as a good init value!
+                dim(initattrs)=c(nrow(triadsdata.df),3,2)
+                list(est_trial_option_attribute=initattrs)
+            },##Sanity check on these inits: hist(with(triadsdata.df,c(scaled.NS1,scaled.NS2,scaled.NS3,scaled.EW1,scaled.EW2,scaled.EW3)))
+            control=list(max_treedepth=18,adapt_delta=.99)
             )
 
-save.image(file="ordusefit2_consans.RData")
+save.image(file="testing_inferobs.RData")#overwrite previous.

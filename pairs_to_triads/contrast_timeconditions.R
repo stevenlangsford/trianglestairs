@@ -1,0 +1,46 @@
+library(tidyverse)
+library(rstan)
+library(shinystan)
+library(patchwork)
+rm(list=ls())
+
+##loop through all the RData files (saved by fit_seepairsesttriads.R) Each .RData corresponds to one participant in one timepressure condition. The loaded environment contains a targid, a conditionflag, and three fits, one each from allords, matchords, and noords.
+##This file gets a goodness score for each fit for each participant for each condition. For now the goodness score is sum(log(prob_prediced_for_endorsed_choice))
+fitgoodness.df <- data.frame(); 
+
+for(afile in list.files(pattern="*.RData")){
+    load(afile)
+
+    goodness_score <- function(triadfit,actualchoices){
+        predsamples <- as.data.frame(rstan::extract(triadfit,permute=TRUE))%>%
+            select(starts_with("triad"))%>%
+            gather(triad,choice)%>%
+            group_by(triad)%>%
+            summarize(targ=sum(choice==1)/n(),
+                      comp=sum(choice==2)/n(),
+                      decoy=sum(choice==3)/n())%>%#Pretty sure this labelling is right but for the love of all things scientific do double check it.
+            ungroup()%>%mutate(triad=substr(triad,7,nchar(triad)))
+
+        triadsdata.df$choicenumber = as.numeric(ordered(triadsdata.df$rolechosen,levels=c("targ","comp","decoy")))
+
+        predsamples$obs <- actualchoices
+
+        for(i in 1:nrow(predsamples)){
+            predsamples[i,"log_p_obs"] <- log(predsamples[i,as.numeric(predsamples[i,"obs"])+1])#+1 to ignore first col, cols 2,3,4 ref targ comp decoy ie choices 1,2,3
+        }
+
+        return(sum(predsamples$log_p_obs))
+    }
+
+    ## rm(list=setdiff(ls(),c("allords","noords","matchords","goodness_score")))
+    ## load(file="pair_paramests.RData")
+
+    triadsdata.df$choicenumber <- as.numeric(ordered(triadsdata.df$rolechosen,levels=c("targ","comp","decoy")))
+
+    for(afit in c("triadfit_allords","triadfit_matchords","triadfit_noords")){
+        fitgoodness.df <- rbind(fitgoodness.df, data.frame(ppntid=targid,conditionflag=conditionflag,afit=afit, score=goodness_score(eval(parse(text=afit)),triadsdata.df$choicenumber)))
+    }
+}#end for each Rdata file in view.
+
+#ggplot(fitgoodness.df,aes(x=conditionflag,y=score,color=afit,shape=as.factor(ppntid)))+geom_jitter(size=5)+theme_bw()+guides(shape=FALSE)#for tiny n
+ggplot(fitgoodness.df,aes(x=conditionflag,y=score,color=afit))+geom_violin()+theme_bw() #for realistic n

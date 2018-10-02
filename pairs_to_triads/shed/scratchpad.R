@@ -56,3 +56,6 @@ return(sum(predsamples$log_p_obs))
 
 print(goodness_score(triadfit_allords)) #is it true that the number of params is the same, in which case this is all you need? Really not sure.
 print(goodness_score(triadfit_matchords))
+
+
+

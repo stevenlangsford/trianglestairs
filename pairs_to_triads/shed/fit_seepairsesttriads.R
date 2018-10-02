@@ -57,8 +57,6 @@ triadsdata.df <- triadsdata.df%>%mutate(
                                      scaled.EW2=EastWest2/sqrt(scalingconstant),
                                      scaled.EW3=EastWest3/sqrt(scalingconstant)
                                  )
-triadsdata.df$choicenumber <- as.numeric(ordered(triadsdata.df$rolechosen,levels=c("targ","comp","decoy")))
-
 calcobs <- matrix(,nrow=nrow(triadsdata.df),ncol=3)
 ordobs.df <- data.frame()
 ordobs_matches.df <- data.frame()
@@ -74,70 +72,90 @@ for(i in 1:nrow(triadsdata.df)){
                option1id=1,
                option2id=2,
                ord_attribute=1,
-               ord_status=triadsdata.df[i,"scaled.NS1"]-triadsdata.df[i,"scaled.NS2"],
-               matchstatus=triadsdata.df[i,"templatetype1"]==triadsdata.df[i,"templatetype2"]
-               )
+               ord_status=triadsdata.df[i,"scaled.NS1"]-triadsdata.df[i,"scaled.NS2"])
     ##ord 1-3
     ordNS13 <- data.frame(trialid=i,
                option1id=1,
                option2id=3,
                ord_attribute=1,
-               ord_status=triadsdata.df[i,"scaled.NS1"]-triadsdata.df[i,"scaled.NS3"],
-               matchstatus=triadsdata.df[i,"templatetype1"]==triadsdata.df[i,"templatetype3"])
+               ord_status=triadsdata.df[i,"scaled.NS1"]-triadsdata.df[i,"scaled.NS3"])
     ##ord 2-3
     ordNS23 <- data.frame(trialid=i,
                option1id=2,
                option2id=3,
                ord_attribute=1,
-               ord_status=triadsdata.df[i,"scaled.NS2"]-triadsdata.df[i,"scaled.NS3"],
-               matchstatus=triadsdata.df[i,"templatetype2"]==triadsdata.df[i,"templatetype3"])
+               ord_status=triadsdata.df[i,"scaled.NS2"]-triadsdata.df[i,"scaled.NS3"])
 ##East-West attribute:
         ##ord 1-2
     ordEW12 <- data.frame(trialid=i,
                option1id=1,
                option2id=2,
                ord_attribute=2,
-               ord_status=triadsdata.df[i,"scaled.EW1"]-triadsdata.df[i,"scaled.EW2"],
-               matchstatus=triadsdata.df[i,"templatetype1"]==triadsdata.df[i,"templatetype2"])
+               ord_status=triadsdata.df[i,"scaled.EW1"]-triadsdata.df[i,"scaled.EW2"])
     ##ord 1-3
     ordEW13 <- data.frame(trialid=i,
                option1id=1,
                option2id=3,
                ord_attribute=2,
-               ord_status=triadsdata.df[i,"scaled.EW1"]-triadsdata.df[i,"scaled.EW3"],
-               matchstatus=triadsdata.df[i,"templatetype1"]==triadsdata.df[i,"templatetype3"])
+               ord_status=triadsdata.df[i,"scaled.EW1"]-triadsdata.df[i,"scaled.EW3"])
     ##ord 2-3
     ordEW23 <- data.frame(trialid=i,
                option1id=2,
                option2id=3,
                ord_attribute=2,
-               ord_status=triadsdata.df[i,"scaled.EW2"]-triadsdata.df[i,"scaled.EW3"],
-               matchstatus=triadsdata.df[i,"templatetype2"]==triadsdata.df[i,"templatetype3"])
+               ord_status=triadsdata.df[i,"scaled.EW2"]-triadsdata.df[i,"scaled.EW3"])
 
     
     ordobs.df <- rbind(ordobs.df,ordNS12,ordNS13,ordNS23,ordEW12,ordEW13,ordEW23)
+    ##matching templates only version:
+    if(triadsdata.df$templatetype1[i]==triadsdata.df$templatetype2[i]){
+        ordobs_matches.df <- rbind(ordobs_matches.df,ordNS12,ordEW12)
+    }
+    if(triadsdata.df$templatetype1[i]==triadsdata.df$templatetype3[i]){
+        ordobs_matches.df <- rbind(ordobs_matches.df,ordNS13,ordEW13)
+    }
+    if(triadsdata.df$templatetype2[i]==triadsdata.df$templatetype3[i]){
+        ordobs_matches.df <- rbind(ordobs_matches.df,ordNS23,ordEW23)
+    }
 }##end for each triad
 
-ordobs_matches.df <- filter(ordobs.df,matchstatus==TRUE)
 
+datalist_pairs <- list(
+    ##pairs
+    N=nrow(pairsdata.df),
+    diff = pairsdata.df$diff,
+    choice = pairsdata.df$choice#,
+    ##triads
+    ## hm_triads = nrow(triadsdata.df),
+    ## calcobs=calcobs,
+    ## hm_ordobs=nrow(ordobs.df),
+    ## ord_trialid=ordobs.df$trialid,
+    ## ord_option1=ordobs.df$option1id,
+    ## ord_option2=ordobs.df$option2id,
+    ## ord_attribute=ordobs.df$ord_attribute,
+    ## ord_status=ordobs.df$ord_status    
+)
 
-## datalist_pairs <- list(
-##     N=nrow(pairsdata.df),
-##     diff = pairsdata.df$diff,
-##     choice = pairsdata.df$choice#,
-## )
+fit <- stan(file="seepairs_getests.stan",
+            data=datalist_pairs,
+            iter=1000,
+            chains=4#,
+            ## init=function(){
+            ##     initattrs <- rep(1,nrow(triadsdata.df)*3*2) #trials * options * attributes. Need to consider what counts as a good init value!
+            ##     dim(initattrs)=c(nrow(triadsdata.df),3,2)
+            ##     list(est_trial_option_attribute=initattrs)
+            ## },##Sanity check on these inits: hist(with(triadsdata.df,c(scaled.NS1,scaled.NS2,scaled.NS3,scaled.EW1,scaled.EW2,scaled.EW3)))
+            ## control=list(max_treedepth=15)
+            )
 
-## fit <- stan(file="seepairs_getests.stan",
-##             data=datalist_pairs,
-##             iter=1000,
-##             chains=4
-##             )
+pairsamples <- as.data.frame(rstan::extract(fit,permuted=TRUE))
 
-## pairsamples <- as.data.frame(rstan::extract(fit,permuted=TRUE))
-
-pairsamples <- data.frame(sigma=.1,tolerance=.1) #DEV CHEAT
-
-datalist <- list(
+datalist_allords <- list(
+    ##pairs
+    ## N=nrow(pairsdata.df),
+    ## diff = pairsdata.df$diff,
+    ## choice = pairsdata.df$choice,
+    ##triads
     sigma=mean(pairsamples$sigma),#POINTEST HACK
     tolerance=mean(pairsamples$tolerance),#POINTEST HACK
     hm_triads = nrow(triadsdata.df),
@@ -147,13 +165,11 @@ datalist <- list(
     ord_option1=ordobs.df$option1id,
     ord_option2=ordobs.df$option2id,
     ord_attribute=ordobs.df$ord_attribute,
-    ord_status=ordobs.df$ord_status,
-    triad_choice=triadsdata.df$choicenumber,
-    matchstatus=as.numeric(ordobs.df$matchstatus)#note this is still a todo
+    ord_status=ordobs.df$ord_status    
 )
 
-triadfit_obsuse <- stan(file="seetriads_predictobsuse.stan",
-            data=datalist,
+triadfit_allords <- stan(file="seeests_predicttriads.stan",
+            data=datalist_allords,
             iter=1000,
             chains=4,
             init=function(){
@@ -161,7 +177,62 @@ triadfit_obsuse <- stan(file="seetriads_predictobsuse.stan",
                 dim(initattrs)=c(nrow(triadsdata.df),3,2)
                 list(est_trial_option_attribute=initattrs)
             },##Sanity check on these inits: hist(with(triadsdata.df,c(scaled.NS1,scaled.NS2,scaled.NS3,scaled.EW1,scaled.EW2,scaled.EW3)))
-            control=list(max_treedepth=15,adapt_delta=.99)
+            control=list(max_treedepth=15)
             )
 
-save.image(file="ordusefit2_consans.RData")
+datalist_matchords <- list(
+    ##pairs
+    ## N=nrow(pairsdata.df),
+    ## diff = pairsdata.df$diff,
+    ## choice = pairsdata.df$choice,
+    ##triads
+    sigma=mean(pairsamples$sigma),#POINTEST HACK
+    tolerance=mean(pairsamples$tolerance),#POINTEST HACK
+    hm_triads = nrow(triadsdata.df),
+    calcobs=calcobs,
+    hm_ordobs=nrow(ordobs_matches.df),
+    ord_trialid=ordobs_matches.df$trialid,
+    ord_option1=ordobs_matches.df$option1id,
+    ord_option2=ordobs_matches.df$option2id,
+    ord_attribute=ordobs_matches.df$ord_attribute,
+    ord_status=ordobs_matches.df$ord_status    
+)
+
+triadfit_matchords <- stan(file="seeests_predicttriads.stan",
+            data=datalist_matchords,
+            iter=1000,
+            chains=4,
+            init=function(){
+                initattrs <- rep(1,nrow(triadsdata.df)*3*2) #trials * options * attributes. Need to consider what counts as a good init value!
+                dim(initattrs)=c(nrow(triadsdata.df),3,2)
+                list(est_trial_option_attribute=initattrs)
+            },##Sanity check on these inits: hist(with(triadsdata.df,c(scaled.NS1,scaled.NS2,scaled.NS3,scaled.EW1,scaled.EW2,scaled.EW3)))
+            control=list(max_treedepth=15)
+            )
+
+    datalist_noords <- list(
+    ##pairs
+    ## N=nrow(pairsdata.df),
+    ## diff = pairsdata.df$diff,
+    ## choice = pairsdata.df$choice,
+    ##triads
+    sigma=mean(pairsamples$sigma),#POINTEST HACK
+    tolerance=mean(pairsamples$tolerance),#POINTEST HACK
+    hm_triads = nrow(triadsdata.df),
+    calcobs=calcobs
+)
+
+triadfit_noords <- stan(file="seeests_predicttriads_NOORD.stan",
+            data=datalist_noords,
+            iter=1000,
+            chains=4,
+            init=function(){
+                initattrs <- rep(1,nrow(triadsdata.df)*3*2) #trials * options * attributes. Need to consider what counts as a good init value!
+                dim(initattrs)=c(nrow(triadsdata.df),3,2)
+                list(est_trial_option_attribute=initattrs)
+            },##Sanity check on these inits: hist(with(triadsdata.df,c(scaled.NS1,scaled.NS2,scaled.NS3,scaled.EW1,scaled.EW2,scaled.EW3)))
+            control=list(max_treedepth=15)
+            )
+
+
+save.image(file="pair_paramests.RData")

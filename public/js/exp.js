@@ -693,7 +693,7 @@ var questionblockobj = function(myquestion){
 	}
 	else if(this.trialindex<this.trials.length){
 	    document.getElementById("pgtitle").innerHTML="<h1>"+this.qtitle+"</h1>";
-	    document.getElementById("expfooter").innerHTML="<p> "+(Math.floor(this.trialindex/this.trials.length*100))+"% of block "+(blockindex+1)+", "+(all_questionblocks.length-blockindex+" remaining"); //ugh, global vars. Ew.
+	    document.getElementById("expfooter").innerHTML="<p> "+(Math.floor(this.trialindex/this.trials.length*100))+"% of this block complete";
 	    this.trials[this.trialindex].drawme("uberdiv");
 	    this.trialindex++;
 	}else{

@@ -2,15 +2,23 @@ body {
     background-color:lightgrey;
     color:black;
     font-size:1.5em;
+    padding:0px;
+    margin:0px;
+    border:none;
 }
 h1 {
-    width:100%;
+    font-size:1.5em;
     margin-left:auto;
     margin-right:auto;
+    /* margin-top:0px; */
     text-align:center;
-    display:inline-block;
+    display:block;
+    width:100%;
+    position:relative;
+    top:-10px;
 }
 p {
+    width:95%;
     margin-left:auto;
     margin-right:auto;
     display:block;
@@ -35,7 +43,7 @@ p {
      display:block;
      text-align:center;
      justify-content:center;
-     padding:20px;
+     padding:10px;
 
      /* margin:auto; */
      width:100%;

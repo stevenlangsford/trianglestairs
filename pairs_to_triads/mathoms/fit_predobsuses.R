@@ -149,7 +149,7 @@ datalist <- list(
     ord_attribute=ordobs.df$ord_attribute,
     ord_status=ordobs.df$ord_status,
     triad_choice=triadsdata.df$choicenumber,
-    matchstatus=as.numeric(ordobs.df$matchstatus)#note this is still a todo
+    matchstatus=as.numeric(ordobs.df$matchstatus)
 )
 
 triadfit_obsuse <- stan(file="seetriads_predictobsuse.stan",

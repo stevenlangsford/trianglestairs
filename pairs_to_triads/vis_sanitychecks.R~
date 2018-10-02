@@ -1,0 +1,7 @@
+library(tidyverse)
+library(rstan)
+library(shinystan)
+rm(list=ls())
+source("readData.R")
+
+##
