@@ -1,7 +1,7 @@
+//embarassing diag hacks:
+var verboseresponses = false;//DIAG FLAG used in response listener. False for public-facing version... possibly leave the var in for messing from js console?
+var bob; //diag misc holder for things you want to examine from the console. Hi bob.
 //exp level setup args:
-var verboseresponses = true;//DIAG FLAG used in response listener. False for public-facing version... possibly leave the var in for messing from js console?
-var bob; //diag holder for things you want to examine in console. Delete this.
-
 var timeout_penalty = 5000; //infuriating enforced pause on timeout screen.
 var timeout_master_time = 2000; //this value is passed to the constructor of any trialobj objects in time-pressure blocks. The similar-looking timeout_time is the global state var timepressure_loop polls continously to see if the current trial has timed out yet: this value is set by each trialobj when it draws so they can be different.
 
@@ -116,12 +116,13 @@ function recordResponse(positionchosen,stimsummary,stimid){
     stimsummary.presentationsequence = trialindex;
 
     if(verboseresponses){
-	bob=stimsummary;//DIAG delete me.
-	console.log(stimsummary.rolechosen);
+	bob=stimsummary;//DIAG, embarassing, but convenient to expose to the console. Hi bob.
+	console.log("this is position "+positionchosen);
 	var codenumber = stimsummary.rolechosen=="targ" ? 1 : stimsummary.rolechosen=="comp" ? 2 : 3;
-	console.log("will code as:"+codenumber);
-	console.log("that is: "+stimsummary["templatetype"+codenumber]+ " of area "+stimsummary["area"+codenumber]);
-	console.log("see bob for details");
+	console.log(stimsummary.rolechosen+ "ie choice-code number is"+codenumber);
+	console.log("that is: "+stimsummary["templatetype"+codenumber]+ " of area "+Math.round(stimsummary["area"+codenumber])+"("+JSON.stringify(stimsummary.triangles[codenumber-1])+")");
+	console.log(stimsummary.presentation_position);
+	console.log("see bob for details "+bob.stimid);
     }
     else{
 	nextTrial();
@@ -343,9 +344,9 @@ function trialobj(triangles,roles,stimid,decoydist,timelimit){ //responsible for
 	timeout_time=timelimit; //trial objs are in control of when they want to time out. Infinity for 'never'.
 	drawtime=Date.now();//public, visible to response-recording function. Which also records response time when hit, so between them you have total view time.
 	document.getElementById(targdiv).innerHTML = "<table style='border:solid 3px "+(this.timelimit < Infinity ? "red" : "black")+"'>"+//haha, tables. Oh dear.
-	"<tr><td colspan='2' align='center' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
+	"<tr><td colspan='2' align='center' class='buttontd'><button class='responsebutton' onclick=recordResponse('2','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
 	    "<tr><td colspan='2' align='center'><canvas id='stimcanvas' width='"+canvassize+"' height='"+canvassize+"'></canvas></td></tr>"+
-	    "<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td><td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('2','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
+	    "<tr><td align='left' class='buttontd'><button class='responsebutton' onclick=recordResponse('1','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td><td align='right' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>";
 	//old table-based draw:
 	// document.getElementById(targdiv).innerHTML="<table style='border:solid 3px black'>"+//haha, tables. Oh dear.
 	// "<tr><td colspan='2' align='center' class='buttontd'><button class='responsebutton' onclick=recordResponse('0','"+this.summaryobj()+"','"+this.stimid+"') disabled>This one</button></td></tr>"+
@@ -388,7 +389,7 @@ function trialobj(triangles,roles,stimid,decoydist,timelimit){ //responsible for
 	this.triangles[this.presentation_position[2]].drawme(document.getElementById('stimcanvas'),
 							jitter*Math.random()-jitter/2+center_x+this.triangles[this.presentation_position[2]].drawoffset_x()+d*Math.cos(4.0/3.0*Math.PI),
 							jitter*Math.random()-jitter/2+center_y+this.triangles[this.presentation_position[2]].drawoffset_y()+d*Math.sin(4.0/3.0*Math.PI),
-							"black"); //colors useful for diag/dev. Could also be used as a fun manipulation to do things to the similarity structure? Could be a fun companion study?
+							"black"); //colors useful for diag/dev. But not as useful as you might think, really. Could be a fun manipulation to do things to the similarity structure? Meh.
 	
 	//diag center pointer:
 	// var ctx = document.getElementById('stimcanvas').getContext('2d');

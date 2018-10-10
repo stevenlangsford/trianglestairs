@@ -1,19 +1,16 @@
 library(tidyverse)
 library(rstan)
 library(shinystan)
-library(patchwork)
 rm(list=ls())
 
-##loop through all the RData files (saved by fit_seepairsesttriads.R) Each .RData corresponds to one participant in one timepressure condition. The loaded environment contains a targid, a conditionflag, and three fits, one each from allords, matchords, and noords.
-##This file gets a goodness score for each fit for each participant for each condition. For now the goodness score is sum(log(prob_prediced_for_endorsed_choice))
-fitgoodness.df <- data.frame(); 
+source("readData.R")
+load("2966362notimepressurefit.RData")
+triadsdata.df$choicenumber <- as.numeric(ordered(triadsdata.df$rolechosen,levels=c("targ","comp","decoy")))#This line moved into readData, but after 2966362notimepressurefit was created, patch here only needed for that dev dataset (right?)
 
-for(afile in list.files(pattern="*.RData")){
-    load(afile)
 
     goodness_score <- function(triadfit,actualchoices){
         predsamples <- as.data.frame(rstan::extract(triadfit,permute=TRUE))%>%
-            select(starts_with("triad"))%>%
+            select(starts_with("triad_choice."))%>%
             gather(triad,choice)%>%
             group_by(triad)%>%
             summarize(targ=sum(choice==1)/n(),
@@ -32,15 +29,8 @@ for(afile in list.files(pattern="*.RData")){
         return(sum(predsamples$log_p_obs))
     }
 
-    ## rm(list=setdiff(ls(),c("allords","noords","matchords","goodness_score")))
-    ## load(file="pair_paramests.RData")
 
-    triadsdata.df$choicenumber <- as.numeric(ordered(triadsdata.df$rolechosen,levels=c("targ","comp","decoy")))
-
-    for(afit in c("triadfit_allords","triadfit_matchords","triadfit_noords")){
+fitgoodness.df <- data.frame();
+    for(afit in c("fit_allords","fit_matchords","fit_sansords")){
         fitgoodness.df <- rbind(fitgoodness.df, data.frame(ppntid=targid,conditionflag=conditionflag,afit=afit, score=goodness_score(eval(parse(text=afit)),triadsdata.df$choicenumber)))
     }
-}#end for each Rdata file in view.
-
-#ggplot(fitgoodness.df,aes(x=conditionflag,y=score,color=afit,shape=as.factor(ppntid)))+geom_jitter(size=5)+theme_bw()+guides(shape=FALSE)#for tiny n
-ggplot(fitgoodness.df,aes(x=conditionflag,y=score,color=afit))+geom_violin()+theme_bw() #for realistic n
