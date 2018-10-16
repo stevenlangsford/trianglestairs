@@ -1,7 +1,7 @@
 var ppntID = Math.round(Math.random()*10000000);
 localStorage.setItem("ppntID",ppntID); //cookie alternative, retrive with localStorage.getItem("ppntID"). Only stores strings. Used in exp.js to tag trials.
 
-var dev = true; //could consider putting this in localStorage too, in case you want some verbose diag messages elsewhere in testing.
+var dev = false;// true; //could consider putting this in localStorage too, in case you want some verbose diag messages elsewhere in testing.
 var instructionindex = 0;
 var sst = function(){
     $.post('/exp_triads',function(data){window.location.replace(data)});
