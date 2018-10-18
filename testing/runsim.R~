@@ -1,0 +1,75 @@
+library(tidyverse)
+library(rstan)
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE)
+
+##set up some stim here:
+stim.df <- data.frame()
+
+##attraction-like things at different distances:
+for(decoydist in seq(from = .7, to = 1.1, length=10)){
+    stim.df <- rbind(stim.df, data.frame(targx=1,targy=.5, compx=.5,compy=1, decoyx=1*sqrt(decoydist),decoyy=.5*sqrt(decoydist)) )
+}
+
+
+##get obs from stim.df
+##calc obs
+calcobs <- matrix(nrow=nrow(stim.df),ncol=3)
+for(i in 1:nrow(stim.df)){#true values, ie mean of calcobs dist.
+    calcobs[i,1]=stim.df[i,"targx"]*stim.df[i,"targy"]*0.5
+    calcobs[i,2]=stim.df[i,"compx"]*stim.df[i,"compy"]*0.5
+    calcobs[i,3]=stim.df[i,"decoyx"]*stim.df[i,"decoyy"]*0.5
+}
+##ord obs
+ordobs.df <- data.frame()
+    for(atrial in 1:nrow(stim.df)){
+        for(anattribute in 1:2){
+            for(option1 in 1:3){
+                for(option2 in 1:option1){
+                    if(option1==option2)next;
+
+                    attributename = c("x","y")[anattribute]
+                    option1name = c("targ","comp","decoy")[option1]
+                    option2name = c("targ","comp","decoy")[option2]
+                    mydifference = stim.df[atrial,paste0(option1name,attributename)]- stim.df[atrial,paste0(option2name,attributename)]
+                    
+                    ordobs.df <- rbind(ordobs.df,data.frame(
+                                                     trialid=atrial,
+                                                     option1=option1,
+                                                     option2=option2,
+                                                     attribute=anattribute,
+                                                     ord_status = mydifference
+                                                     ))
+                    
+                    
+                }
+            }
+        }
+    }
+    datalist <- list(
+        sigma=.1,
+        tolerance=.1,
+        hm_triads=nrow(stim.df),
+        hm_ordobs=nrow(ordobs.df),
+        ord_trialid=ordobs.df$trialid,
+        ord_option1=ordobs.df$option1,
+        ord_option2=ordobs.df$option2,
+        ord_attribute=ordobs.df$attribute,
+        ord_status=ordobs.df$ord_status
+    )
+
+
+fit <- stan(file="seeests_predicttriads.stan",
+            data=datalist,
+            iter=1000,
+            chains=4,
+            init=function(){
+                initattrs <- rep(1,nrow(stim.df)*3*2) #trials * options * attributes. Need to consider what counts as a good init value!
+                dim(initattrs)=c(nrow(stim.df),3,2)
+                list(est_trial_option_attribute=initattrs)
+            },##Sanity check on these inits: hist(with(triadsdata.df,c(scaled.NS1,scaled.NS2,scaled.NS3,scaled.EW1,scaled.EW2,scaled.EW3)))
+            control=list(max_treedepth=15)
+            )
+
+
+save.image(file="simfit.RData")

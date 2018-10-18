@@ -1,6 +1,0 @@
-library(tidyverse)
-library(rstan)
-library(shinystan)
-library(patchwork)
-rm(list=ls())
-load("pair_paramests.RData")

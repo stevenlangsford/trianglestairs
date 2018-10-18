@@ -1,0 +1,28 @@
+data{
+  //pairs info
+  real<lower=0> sigma; //how to pass a distribution instead of a point estimate? If you use a local dist object, it'll update?
+  real<lower=0> tolerance;
+  
+  //Triad info:
+  int hm_triads;
+  vector[3] calcobs[hm_triads]; //this is true values, should be turned into a noisy calcobs locally with noise level estimated from pairs?
+  int hm_ordobs;
+  int ord_trialid[hm_ordobs];
+  int ord_option1[hm_ordobs];
+  int ord_option2[hm_ordobs];
+  int ord_attribute[hm_ordobs];
+  real ord_status[hm_ordobs]; //passed as (acurate) difference in value, convert to discreet ordobs with reference to tolerance value, estimated from pairs.
+}
+parameters{
+   matrix<lower=0>[3,2] est_trial_option_attribute[hm_triads];
+}
+
+model{
+  for(atrial in 1:hm_triads){
+    for(anoption in 1:3){
+      for(anattribute in 1:2){
+	
+      }
+    }
+  }
+}

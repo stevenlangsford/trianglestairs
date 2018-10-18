@@ -1,0 +1,36 @@
+library(tidyverse)
+library(rstan)
+library(patchwork)
+
+rm(list=ls())
+load("simfit.RData")
+
+mysamples <- as.data.frame(extract(fit,permuted=TRUE))
+
+##vis_trial <- function(trialid)
+
+trialid=9;
+choices <- mysamples%>%select(paste0("triad_choice.",trialid))#%>%gather(option,endorsements)
+
+#ggplot(choices,aes_string(paste0("triad_choice.",trialid)))+geom_bar()+theme_bw()
+
+
+targcloud <- data.frame(
+    x=mysamples[,paste0("est_trial_option_attribute.",trialid,".1.1")],
+    y=mysamples[,paste0("est_trial_option_attribute.",trialid,".1.2")])
+compcloud <- data.frame(
+    x=mysamples[,paste0("est_trial_option_attribute.",trialid,".2.1")],
+    y=mysamples[,paste0("est_trial_option_attribute.",trialid,".2.2")])
+decoycloud <- data.frame(
+    x=mysamples[,paste0("est_trial_option_attribute.",trialid,".3.1")],
+    y=mysamples[,paste0("est_trial_option_attribute.",trialid,".3.2")])
+    
+ggplot(stim.df[trialid,])+
+    geom_point(data=targcloud,aes(x=x,y=y),alpha=.3,color="red")+
+    geom_point(data=compcloud,aes(x=x,y=y),alpha=.3,color="green")+
+    geom_point(data=decoycloud,aes(x=x,y=y),alpha=.3,color="blue")+
+    geom_point(aes(x=targx,y=targy,color="red",size=5))+
+    geom_point(aes(x=compx,y=compy,color="green",size=5))+
+    geom_point(aes(x=decoyx,y=decoyy,color="blue",size=5))+
+    guides(color=FALSE,size=FALSE)+
+    theme_bw()

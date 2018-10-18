@@ -1,4 +1,0 @@
-library(tidyverse)
-library(rstan)
-rm(list=ls())
-
