@@ -22,3 +22,5 @@ triadsdata.df$choicenumber <- as.numeric(ordered(triadsdata.df$rolechosen,levels
 triadsdata.df$timelimit <- ifelse(is.na(triadsdata.df$timelimit),"selfpaced",2000) #magic values ref'd in realDatamin.R, any changes must propagate, sorry. 
 #do exclusions here?
 triadsdata.df$stimtype <- sapply(triadsdata.df$stimid,function(x){substr(x,1,3)})
+triadsdata.df$inspectiontime <- triadsdata.df$responsetime-triadsdata.df$drawtime
+triadsdata.df$templatesetcode <-  sapply(triadsdata.df$stimid,function(x){me <- as.character(x);substr(me, nchar(me)-2,nchar(me))}) #aaaaaaaaah so ugly and assumes a particular stimid format :-((

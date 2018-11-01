@@ -1,0 +1,15 @@
+library(tidyverse)
+library(rstan)
+rm(list=ls())
+source("readData.R")
+
+ggplot(pairsdata.df,aes(x=inspectiontime,color=templatetype1==templatetype2))+geom_density()+theme_bw()+ggtitle("Response times to pairs")
+
+ggplot(filter(triadsdata.df,timelimit=="selfpaced"),aes(x=inspectiontime))+geom_density()+theme_bw()+ggtitle("Overall triad response times")
+
+ggplot(filter(triadsdata.df,timelimit=="selfpaced"),aes(x=inspectiontime,color=stimtype))+geom_density()+theme_bw()+ggtitle("Triad response times by trial type")
+
+ggplot(filter(triadsdata.df,timelimit=="selfpaced",stimtype=="att"),aes(x=inspectiontime,color=templatesetcode))+geom_density()+theme_bw()+ggtitle("Response times by matchingness for attraction trials")
+
+
+#Check the template codes mean what you think they mean re position/order

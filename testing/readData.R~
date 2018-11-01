@@ -21,3 +21,4 @@ triadsdata.df$choicenumber <- as.numeric(ordered(triadsdata.df$rolechosen,levels
 #as.numeric(ordered(triadsdata.df$rolechosen,levels=c("targ","comp","decoy")))#stan codes choices as 1,2,3: like this, right?
 triadsdata.df$timelimit <- ifelse(is.na(triadsdata.df$timelimit),"selfpaced",2000) #magic values ref'd in realDatamin.R, any changes must propagate, sorry. 
 #do exclusions here?
+triadsdata.df$stimtype <- sapply(triadsdata.df$stimid,function(x){substr(x,1,3)})
